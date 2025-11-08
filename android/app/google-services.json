@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "501260037462",
+    "firebase_url": "https://zygreeen-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "zygreeen",
+    "storage_bucket": "zygreeen.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:501260037462:android:ebf9f555934571d0a23af7",
+        "android_client_info": {
+          "package_name": "com.example.zygreen_air_purifier"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXCXceC0qdjvcKR8kcrbO_Z5SJP28_ULA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,8 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
+import 'package:zygreen_air_purifier/providers/esp32_provider.dart';
+import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
 import 'package:zygreen_air_purifier/screens/splash_screen.dart';
 import 'package:zygreen_air_purifier/theme/app_theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyCU5jQjKRHRni2rqrTjhQY7ZNW91OkcH_s",
+      appId: "1:501260037462:web:2cc0d81dd61664c7a23af7",
+      messagingSenderId: "501260037462",
+      projectId: "zygreeen",
+      storageBucket: "zygreeen.firebasestorage.app",
+      authDomain: "zygreeen.firebaseapp.com",
+      databaseURL: "https://zygreeen-default-rtdb.asia-southeast1.firebasedatabase.app",
+      measurementId: "G-DCRFKL21Y4",
+    ),
+  );
   runApp(const MyApp());
 }
 
@@ -11,11 +28,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Zygreen Air Purifier',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ESP32Provider()),
+        ChangeNotifierProvider(create: (_) => SensorProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Zygreen Air Purifier',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: const SplashScreen(),
+      ),
     );
   }
 }

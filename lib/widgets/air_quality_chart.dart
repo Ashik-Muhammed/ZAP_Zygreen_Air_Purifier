@@ -24,117 +24,20 @@ class AQIData {
 }
 
 class AirQualityChart extends StatefulWidget {
-  const AirQualityChart({super.key});
+  final double airQuality;
+  final bool isLoading;
+  
+  const AirQualityChart({
+    super.key, 
+    required this.airQuality,
+    this.isLoading = false,
+  });
 
   @override
   State<AirQualityChart> createState() => _AirQualityChartState();
 }
 
 class _AirQualityChartState extends State<AirQualityChart> {
-  final List<AQIData> aqiData = [
-    AQIData(
-      time: '12AM',
-      value: 50,
-      predictedValue: 52,
-      confidence: 88,
-      color: Colors.green,
-      predictedColor: Colors.green.withValues(alpha: 0.6),
-      status: 'Good',
-      predictedStatus: 'Good',
-    ),
-    AQIData(
-      time: '3AM',
-      value: 45,
-      predictedValue: 48,
-      confidence: 85,
-      color: Colors.green,
-      predictedColor: Colors.green.withValues(alpha: 0.6),
-      status: 'Good',
-      predictedStatus: 'Good',
-    ),
-    AQIData(
-      time: '6AM',
-      value: 40,
-      predictedValue: 55,
-      confidence: 82,
-      color: Colors.green,
-      predictedColor: Colors.green.withValues(alpha: 0.6),
-      status: 'Good',
-      predictedStatus: 'Good',
-    ),
-    AQIData(
-      time: '9AM',
-      value: 60,
-      predictedValue: 65,
-      confidence: 85,
-      color: Colors.orange,
-      predictedColor: Colors.orange.withValues(alpha: 0.6),
-      status: 'Moderate',
-      predictedStatus: 'Moderate',
-    ),
-    AQIData(
-      time: '12PM',
-      value: 75,
-      predictedValue: 78,
-      confidence: 88,
-      color: Colors.orange,
-      predictedColor: Colors.orange.withValues(alpha: 0.6),
-      status: 'Moderate',
-      predictedStatus: 'Moderate',
-    ),
-    AQIData(
-      time: '3PM',
-      value: 85,
-      predictedValue: 88,
-      confidence: 85,
-      color: Colors.orange,
-      predictedColor: Colors.orange.withValues(alpha: 0.6),
-      status: 'Moderate',
-      predictedStatus: 'Moderate',
-    ),
-    AQIData(
-      time: '6PM',
-      value: 65,
-      predictedValue: 72,
-      confidence: 82,
-      color: Colors.orange,
-      predictedColor: Colors.orange.withValues(alpha: 0.6),
-      status: 'Moderate',
-      predictedStatus: 'Moderate',
-    ),
-    // Predicted data points
-    AQIData(
-      time: '9PM',
-      value: 0,
-      predictedValue: 78,
-      confidence: 80,
-      color: Colors.transparent,
-      predictedColor: Colors.orange.withValues(alpha: 0.6),
-      status: 'Predicted',
-      predictedStatus: 'Moderate',
-    ),
-    AQIData(
-      time: '12AM',
-      value: 0,
-      predictedValue: 85,
-      confidence: 78,
-      color: Colors.transparent,
-      predictedColor: Colors.orange.withValues(alpha: 0.6),
-      status: 'Predicted',
-      predictedStatus: 'Moderate',
-    ),
-    AQIData(
-      time: '3AM',
-      value: 0,
-      predictedValue: 92,
-      confidence: 75,
-      color: Colors.transparent,
-      predictedColor: Colors.orange.withValues(alpha: 0.6),
-      status: 'Predicted',
-      predictedStatus: 'Moderate',
-    ),
-  ];
-
   bool _showPrediction = false;
 
   // Toggle prediction visibility
@@ -144,20 +47,107 @@ class _AirQualityChartState extends State<AirQualityChart> {
     });
   }
 
-  // Get the next hour's prediction
-  AQIData? getNextHourPrediction() {
+  // Generate AQI data for the chart
+  List<AQIData> get aqiData {
+    if (widget.isLoading) {
+      // Return placeholder data when loading
+      return List.generate(12, (index) {
+        return AQIData(
+          time: '${index + 1}',
+          value: 0,
+          color: Colors.grey[300]!,
+          predictedColor: Colors.grey[300]!,
+          status: 'Loading...',
+          predictedStatus: '',
+        );
+      });
+    }
+
     final now = DateTime.now();
     final currentHour = now.hour;
-
-    // Find the next hour's data
-    for (var data in aqiData) {
-      final hour = int.tryParse(data.time.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-      final isPM = data.time.contains('PM') && hour < 12;
-      final hour24 = isPM ? hour + 12 : (data.time.contains('AM') && hour == 12 ? 0 : hour);
-
-      if (hour24 > currentHour) {
-        return data;
+    
+    // Generate data for the last 12 hours
+    return List.generate(12, (index) {
+      final hour = (currentHour - 11 + index + 24) % 24; // Last 12 hours (11 hours ago to current)
+      final time = '${hour == 0 ? 12 : hour > 12 ? hour - 12 : hour}${hour < 12 ? 'AM' : 'PM'}';
+      final isCurrentHour = index == 11; // Last item is current hour
+      final isFuture = index > 11; // Future hours for prediction
+      
+      // For the current hour, use the actual air quality value
+      // For past hours, generate realistic values based on time of day
+      // For future hours, generate predictions
+      double baseValue = widget.airQuality.toDouble();
+      double hourFactor = 0.0;
+      
+      // Adjust base value based on time of day (lower at night, higher during day)
+      if (hour >= 22 || hour < 5) {
+        // Night time (10 PM - 5 AM) - lower AQI
+        hourFactor = 0.7;
+      } else if (hour >= 5 && hour < 10) {
+        // Morning (5 AM - 10 AM) - increasing AQI
+        hourFactor = 0.8 + (hour - 5) * 0.04;
+      } else if (hour >= 10 && hour < 17) {
+        // Day time (10 AM - 5 PM) - higher AQI
+        hourFactor = 1.0;
+      } else {
+        // Evening (5 PM - 10 PM) - decreasing AQI
+        hourFactor = 1.0 - (hour - 17) * 0.06;
       }
+      
+      // Add some randomness to make it more realistic
+      final randomFactor = 0.9 + (0.2 * (index % 3));
+      
+      final double value = isCurrentHour 
+          ? widget.airQuality.toDouble() 
+          : (baseValue * hourFactor * randomFactor).clamp(0, 500);
+          
+      // For future predictions, add some trend-based prediction
+      final double predictedValue = isFuture 
+          ? (value * (0.9 + 0.2 * ((index - 11) / 12))).clamp(0, 500)
+          : value;
+          
+      return AQIData(
+        time: time,
+        value: isFuture ? 0 : value, // Don't show values for future hours
+        predictedValue: isFuture ? predictedValue : null,
+        confidence: isFuture ? (85 - (index - 11) * 5).clamp(60, 90) : null,
+        color: _getAqiColor(value),
+        predictedColor: _getAqiColor(predictedValue).withValues(alpha: 0.6),
+        status: isFuture ? '' : _getAqiStatus(value),
+        predictedStatus: isFuture ? _getAqiStatus(predictedValue) : '',
+      );
+    });
+  }
+  
+  Color _getAqiColor(double value) {
+    if (value <= 50) return Colors.green;
+    if (value <= 100) return Colors.yellow[700]!;
+    if (value <= 150) return Colors.orange;
+    if (value <= 200) return Colors.red;
+    if (value <= 300) return Colors.purple;
+    return Colors.brown[900]!;
+  }
+  
+  String _getAqiStatus(double value) {
+    if (value <= 50) return 'Good';
+    if (value <= 100) return 'Moderate';
+    if (value <= 150) return 'Unhealthy for Sensitive';
+    if (value <= 200) return 'Unhealthy';
+    if (value <= 300) return 'Very Unhealthy';
+    return 'Hazardous';
+  }
+
+  // Get the next hour's prediction
+  AQIData? getNextHourPrediction() {
+    if (widget.isLoading) return null;
+    
+    final now = DateTime.now();
+    final currentHour = now.hour;
+    
+    // Get the next hour's data point
+    final nextHourIndex = (currentHour % 12) + 1; // Get index of next hour
+    if (nextHourIndex < aqiData.length) {
+      return aqiData[nextHourIndex];
     }
     return null;
   }

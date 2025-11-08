@@ -31,12 +31,12 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Firebase (using compatible versions)
-  firebase_core: ^2.15.1
-  firebase_database: ^10.2.6
-  firebase_auth: ^4.7.2
-  cloud_firestore: ^4.8.3
-  firebase_ml_model_downloader: ^0.2.0+1
+  # Firebase
+  firebase_core: ^2.27.1
+  firebase_database: ^10.4.7
+  firebase_auth: ^4.18.1
+  cloud_firestore: ^4.15.8
+  firebase_ml_model_downloader: ^0.2.5
   
   # State Management
   provider: ^6.1.1
@@ -48,9 +48,9 @@ dependencies:
   fl_chart: ^0.65.0
   percent_indicator: ^4.2.3
   shimmer: ^3.0.0
+  intl: ^0.18.0  # For date formatting
   
   # Utils
-  intl: ^0.18.0  # For date formatting and internationalization
   shared_preferences: ^2.2.2
   connectivity_plus: ^5.0.2
   permission_handler: ^11.2.0
@@ -58,6 +58,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  web_socket_channel: ^3.0.3
 
 dev_dependencies:
   flutter_test:

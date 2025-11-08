@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
 import 'package:zygreen_air_purifier/theme/app_theme.dart';
 import 'package:zygreen_air_purifier/widgets/metric_card.dart';
 import 'package:zygreen_air_purifier/widgets/air_quality_chart.dart';
@@ -6,10 +8,31 @@ import 'package:zygreen_air_purifier/widgets/air_quality_chart.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
+  Color _getTemperatureColor(double temperature) {
+    if (temperature < 18) return Colors.blue;
+    if (temperature < 25) return Colors.green;
+    if (temperature < 30) return Colors.orange;
+    return Colors.red;
+  }
+
+  Color _getHumidityColor(double humidity) {
+    if (humidity < 30) return Colors.orange;
+    if (humidity < 60) return Colors.green;
+    return Colors.blue;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final sensorProvider = Provider.of<SensorProvider>(context);
+    
+    // Initialize sensor data if not already initialized
+    if (!sensorProvider.isLoading && sensorProvider.timestamp == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        sensorProvider.initSensorData();
+      });
+    }
     
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -38,11 +61,7 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Air Quality Chart
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: AppTheme.spacingM, vertical: AppTheme.spacingS),
-                child: AirQualityChart(),
-              ),
+
               
               // Current Air Quality Status
               Padding(
@@ -57,7 +76,7 @@ class DashboardScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Current Air Quality',
+                            'Air Quality',
                             style: textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
@@ -66,14 +85,9 @@ class DashboardScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: AppTheme.spacingM),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusS),
-                        child: LinearProgressIndicator(
-                          value: 0.3,
-                          backgroundColor: Colors.grey.shade100,
-                          valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.success),
-                          minHeight: 8,
-                        ),
+                      AirQualityChart(
+                        airQuality: sensorProvider.airQuality.toDouble(),
+                        isLoading: sensorProvider.isLoading,
                       ),
                       const SizedBox(height: AppTheme.spacingS),
                       Row(
@@ -106,8 +120,8 @@ class DashboardScreen extends StatelessWidget {
               ),
               
               // Metrics Grid
-              const Padding(
-                padding:   EdgeInsets.symmetric(horizontal: AppTheme.spacingM, vertical: AppTheme.spacingS),
+              Padding(
+                padding:const EdgeInsets.symmetric(horizontal: AppTheme.spacingM, vertical: AppTheme.spacingS),
                 child: Column(
                   children: [
                     Row(
@@ -115,44 +129,48 @@ class DashboardScreen extends StatelessWidget {
                         Expanded(
                           child: MetricCard(
                             title: 'PM2.5',
-                            value: '12',
+                            value: sensorProvider.pm25.toStringAsFixed(1),
                             unit: 'µg/m³',
                             icon: Icons.air,
                             color: AppTheme.accent,
+                            isLoading: sensorProvider.isLoading,
                           ),
                         ),
-                        SizedBox(width: AppTheme.spacingM),
+                        const SizedBox(width: AppTheme.spacingM),
                         Expanded(
                           child: MetricCard(
                             title: 'PM10',
-                            value: '24',
+                            value: sensorProvider.pm10.toStringAsFixed(1),
                             unit: 'µg/m³',
                             icon: Icons.air,
                             color: AppTheme.secondary,
+                            isLoading: sensorProvider.isLoading,
                           ),
                         ),
                       ],
                     ),
-                     SizedBox(height: AppTheme.spacingM),
+                    const SizedBox(height: AppTheme.spacingM),
                     Row(
                       children: [
                         Expanded(
                           child: MetricCard(
                             title: 'Temperature',
-                            value: '24',
+                            value: sensorProvider.temperature.toStringAsFixed(1),
                             unit: '°C',
                             icon: Icons.thermostat,
-                            color: AppTheme.warning,
+                            color: _getTemperatureColor(sensorProvider.temperature),
+                            isLoading: sensorProvider.isLoading,
                           ),
                         ),
-                        SizedBox(width: AppTheme.spacingM),
+                        const SizedBox(width: AppTheme.spacingM),
                         Expanded(
                           child: MetricCard(
                             title: 'Humidity',
-                            value: '45',
+                            value: sensorProvider.humidity.toStringAsFixed(1),
                             unit: '%',
                             icon: Icons.water_drop,
-                            color: AppTheme.info,
+                            color: _getHumidityColor(sensorProvider.humidity),
+                            isLoading: sensorProvider.isLoading,
                           ),
                         ),
                       ],

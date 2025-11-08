@@ -6,6 +6,7 @@ class MetricCard extends StatelessWidget {
   final String unit;
   final IconData icon;
   final Color color;
+  final bool isLoading;
 
   const MetricCard({
     super.key,
@@ -14,6 +15,7 @@ class MetricCard extends StatelessWidget {
     required this.unit,
     required this.icon,
     required this.color,
+    this.isLoading = false,
   });
 
   @override
@@ -58,14 +60,23 @@ class MetricCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    height: 1,
-                  ),
-                ),
+                isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: SizedBox(
+                          width: 40,
+                          height: 24,
+                          child: LinearProgressIndicator(),
+                        ),
+                      )
+                    : Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
                 const SizedBox(width: 4),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 3),
