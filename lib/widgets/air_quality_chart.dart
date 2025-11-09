@@ -156,9 +156,14 @@ class _AirQualityChartState extends State<AirQualityChart> {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -480,7 +485,7 @@ class _AirQualityChartState extends State<AirQualityChart> {
             child: Text(_showPrediction ? 'Hide Prediction' : 'Show Prediction'),
           ),
         ],
-      ),
+      ),)
     );
   }
 
