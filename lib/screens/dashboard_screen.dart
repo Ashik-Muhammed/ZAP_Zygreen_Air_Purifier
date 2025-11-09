@@ -15,29 +15,74 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   Timer? _refreshTimer;
+  bool _isDisposed = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize data when widget is first created
+    WidgetsBinding.instance.addObserver(this);
+    _initializeData();
+  }
+
+  void _initializeData() {
+    if (_isDisposed) return;
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final sensorProvider = Provider.of<SensorProvider>(context, listen: false);
-      sensorProvider.initSensorData();
+      if (_isDisposed) return;
       
-      // Set up periodic refresh every 30 seconds
-      _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        sensorProvider.initSensorData(); // Reuse initSensorData for refresh
-      });
+      try {
+        final sensorProvider = Provider.of<SensorProvider>(context, listen: false);
+        sensorProvider.initSensorData();
+        
+        if (_isDisposed) return;
+        
+        _refreshTimer?.cancel();
+        _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+          if (!_isDisposed && mounted) {
+            sensorProvider.refreshSensorData();
+          }
+        });
+        
+        _isInitialized = true;
+        if (mounted) setState(() {});
+      } catch (e) {
+        debugPrint('Error initializing dashboard: $e');
+      }
     });
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized && !_isDisposed && mounted) {
+      _initializeData();
+    }
+  }
+
+  @override
   void dispose() {
+    _isDisposed = true;
     _refreshTimer?.cancel();
     _refreshTimer = null;
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_isDisposed) return;
+    
+    if (state == AppLifecycleState.resumed) {
+      if (!_isInitialized && mounted) {
+        _initializeData();
+      }
+    } else if (state == AppLifecycleState.paused) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+    }
   }
 
   Color _getTemperatureColor(double temperature) {
@@ -156,9 +201,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => AirQualityTrendScreen(
-              currentAirQuality: sensorProvider.airQuality.toDouble(),
-            ),
+            builder: (context) => const AirQualityTrendScreen(),
           ),
         );
       },
@@ -542,10 +585,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _AirQualityStatus extends StatelessWidget {
-  final int aqiValue;
-  const _AirQualityStatus({required this.aqiValue});
+  const _AirQualityStatus();
 
-  String get _getAqiLabel {
+  String _getAqiLabel(int aqiValue) {
     if (aqiValue <= 50) return 'Good';
     if (aqiValue <= 100) return 'Moderate';
     if (aqiValue <= 150) return 'Unhealthy (Sensitive)';
@@ -554,7 +596,7 @@ class _AirQualityStatus extends StatelessWidget {
     return 'Hazardous';
   }
 
-  Color get _getAqiColor {
+  Color _getAqiColor(int aqiValue) {
     if (aqiValue <= 50) return AppTheme.success;
     if (aqiValue <= 100) return Colors.yellow[700]!;
     if (aqiValue <= 150) return Colors.orange;
@@ -565,27 +607,39 @@ class _AirQualityStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _getAqiColor;
-    final label = _getAqiLabel;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-          const SizedBox(width: 6),
-          Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: color, fontWeight: FontWeight.w600)),
-        ],
-      ),
+    return Consumer<SensorProvider>(
+      builder: (context, sensorProvider, _) {
+        final aqiValue = sensorProvider.airQuality;
+        final color = _getAqiColor(aqiValue);
+        final label = _getAqiLabel(aqiValue);
+        
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8, 
+                height: 8, 
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle)
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelMedium
+                    ?.copyWith(color: color, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

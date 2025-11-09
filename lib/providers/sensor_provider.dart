@@ -1,7 +1,10 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:zygreen_air_purifier/services/firebase_service.dart';
 
 class SensorProvider with ChangeNotifier {
+  final bool _isDisposed = false;
+  StreamSubscription<Map<String, dynamic>>? _subscription;
   final FirebaseService _firebaseService = FirebaseService();
   Map<String, dynamic> _sensorData = {
     'temperature': 0.0,
@@ -26,51 +29,98 @@ class SensorProvider with ChangeNotifier {
 
   // Initialize the sensor data stream
   void initSensorData() {
+    if (_isLoading) return;
+    
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    
+    // Schedule the notification for the next frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isDisposed) {
+        notifyListeners();
+      }
+    });
 
     // Get initial data
     _firebaseService.getLatestSensorData().then((data) {
+      if (_isDisposed) return;
       _sensorData = data;
       _isLoading = false;
-      notifyListeners();
+      if (!_isDisposed) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_isDisposed) notifyListeners();
+        });
+      }
     }).catchError((error) {
+      if (_isDisposed) return;
       _error = 'Failed to load sensor data: $error';
       _isLoading = false;
-      notifyListeners();
+      if (!_isDisposed) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_isDisposed) notifyListeners();
+        });
+      }
     });
 
+    // Cancel any existing subscription
+    _subscription?.cancel();
+    
     // Subscribe to real-time updates
-    _firebaseService.getSensorData().listen(
+    _subscription = _firebaseService.getSensorData().listen(
       (data) {
+        if (_isDisposed) return;
         _sensorData = data;
         _isLoading = false;
         _error = null;
-        notifyListeners();
+        if (!_isDisposed) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_isDisposed) notifyListeners();
+          });
+        }
       },
       onError: (error) {
+        if (_isDisposed) return;
         _error = 'Error in sensor data stream: $error';
         _isLoading = false;
-        notifyListeners();
+        if (!_isDisposed) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_isDisposed) notifyListeners();
+          });
+        }
       },
+      cancelOnError: false,
     );
   }
 
   // Refresh sensor data
   Future<void> refreshSensorData() async {
+    if (_isLoading) return;
+    
     _isLoading = true;
-    notifyListeners();
+    
+    // Schedule the notification for the next frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isDisposed) {
+        notifyListeners();
+      }
+    });
 
     try {
       final data = await _firebaseService.getLatestSensorData();
+      if (_isDisposed) return;
+      
       _sensorData = data;
       _error = null;
     } catch (error) {
+      if (_isDisposed) return;
       _error = 'Failed to refresh sensor data: $error';
     }
 
     _isLoading = false;
-    notifyListeners();
+    if (!_isDisposed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_isDisposed) notifyListeners();
+      });
+    }
   }
 }
