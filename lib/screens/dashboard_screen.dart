@@ -81,7 +81,7 @@ class DashboardScreen extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const _AirQualityStatus(label: 'Good', color: AppTheme.success),
+                          _AirQualityStatus(aqiValue: sensorProvider.airQuality),
                         ],
                       ),
                       const SizedBox(height: AppTheme.spacingM),
@@ -286,24 +286,47 @@ class DashboardScreen extends StatelessWidget {
 }
 
 class _AirQualityStatus extends StatelessWidget {
-  final String label;
-  final Color color;
-
+  final int aqiValue;
+  
   const _AirQualityStatus({
-    required this.label,
-    required this.color,
+    required this.aqiValue,
   });
+
+  String get _getAqiLabel {
+    if (aqiValue <= 50) return 'Good';
+    if (aqiValue <= 100) return 'Moderate';
+    if (aqiValue <= 150) return 'Unhealthy for Sensitive Groups';
+    if (aqiValue <= 200) return 'Unhealthy';
+    if (aqiValue <= 300) return 'Very Unhealthy';
+    return 'Hazardous';
+  }
+
+  Color get _getAqiColor {
+    if (aqiValue <= 50) return AppTheme.success; // Green
+    if (aqiValue <= 100) return Colors.yellow[700]!; // Yellow
+    if (aqiValue <= 150) return Colors.orange; // Orange
+    if (aqiValue <= 200) return Colors.red; // Red
+    if (aqiValue <= 300) return Colors.purple; // Purple
+    return Colors.deepPurple[900]!; // Maroon
+  }
 
   @override
   Widget build(BuildContext context) {
+    final color = _getAqiColor;
+    final label = _getAqiLabel;
+    
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spacingS,
-        vertical: AppTheme.spacingXS,
+        horizontal: 12,
+        vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppTheme.radiusM),
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withValues(alpha: 0.5),
+          width: 1,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -320,9 +343,9 @@ class _AirQualityStatus extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
       ),

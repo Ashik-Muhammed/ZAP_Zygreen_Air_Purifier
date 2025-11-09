@@ -211,9 +211,9 @@ class _AirQualityChartState extends State<AirQualityChart> {
                   children: [
                     // Current AQI
                     _buildAqiBox(
-                      value: '45',
-                      label: 'Good',
-                      color: Colors.green,
+                      value: widget.airQuality.toInt().toString(),
+                      label: _getAqiStatus(widget.airQuality.toDouble()),
+                      color: _getAqiColor(widget.airQuality.toDouble()),
                     ),
                     // Prediction
                     if (_showPrediction) ...[

@@ -14,7 +14,7 @@ class FirebaseService {
         _deviceId = snapshot.children.first.key;
       }
     } catch (e) {
-      print('Error getting device ID: $e');
+//handle silently
     }
     
     _deviceId ??= 'unknown_device';
