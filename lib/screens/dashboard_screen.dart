@@ -1,12 +1,12 @@
-// ignore_for_file: unused_element
+// ignore_for_file: deprecated_member_use
 
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shimmer/shimmer.dart';
+import 'package:zygreen_air_purifier/theme/app_theme.dart';
 import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
 import 'package:zygreen_air_purifier/screens/air_quality_trend_screen.dart';
-import 'package:zygreen_air_purifier/theme/app_theme.dart';
+import 'package:zygreen_air_purifier/screens/connect_device_screen.dart';
+import 'package:zygreen_air_purifier/providers/esp32_provider.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -15,205 +15,570 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
-  Timer? _refreshTimer;
-  bool _isDisposed = false;
-  bool _isInitialized = false;
+class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _initializeData();
-  }
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+    _animationController.forward();
 
-  void _initializeData() {
-    if (_isDisposed) return;
-    
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_isDisposed) return;
-      
-      try {
-        final sensorProvider = Provider.of<SensorProvider>(context, listen: false);
-        sensorProvider.initSensorData();
-        
-        if (_isDisposed) return;
-        
-        _refreshTimer?.cancel();
-        _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-          if (!_isDisposed && mounted) {
-            sensorProvider.refreshSensorData();
-          }
-        });
-        
-        _isInitialized = true;
-        if (mounted) setState(() {});
-      } catch (e) {
-        debugPrint('Error initializing dashboard: $e');
-      }
+      final sensorProvider = context.read<SensorProvider>();
+      sensorProvider.initSensorData();
     });
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isInitialized && !_isDisposed && mounted) {
-      _initializeData();
-    }
-  }
-
-  @override
   void dispose() {
-    _isDisposed = true;
-    _refreshTimer?.cancel();
-    _refreshTimer = null;
-    WidgetsBinding.instance.removeObserver(this);
+    _animationController.dispose();
     super.dispose();
   }
-  
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_isDisposed) return;
-    
-    if (state == AppLifecycleState.resumed) {
-      if (!_isInitialized && mounted) {
-        _initializeData();
-      }
-    } else if (state == AppLifecycleState.paused) {
-      _refreshTimer?.cancel();
-      _refreshTimer = null;
-    }
-  }
 
-  Color _getTemperatureColor(double temperature) {
-    if (temperature < 18) return Colors.blue;
-    if (temperature < 25) return Colors.green;
-    if (temperature < 30) return Colors.orange;
-    return Colors.red;
-  }
-
-  Color _getHumidityColor(double humidity) {
-    if (humidity < 30) return Colors.orange;
-    if (humidity < 60) return Colors.green;
-    return Colors.blue;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await Provider.of<SensorProvider>(context, listen: false)
-                .refreshSensorData();
-          },
-          child: Consumer<SensorProvider>(
-            builder: (context, sensorProvider, _) {
-              return CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  // App Bar
-                  SliverAppBar(
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                    floating: true,
-                    title: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hello, User',
-                          style: textTheme.titleLarge?.copyWith(
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Here\'s your air quality',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                    actions: [
-                      IconButton(
-                        icon: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.notifications_outlined,
-                              color: Colors.black87),
-                        ),
-                        onPressed: () {},
-                      ),
-                      const SizedBox(width: 16),
-                    ],
-                  ),
-
-                  // Main content
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildAirQualityCard(context, sensorProvider, theme),
-                          const SizedBox(height: 20),
-                          _buildMetricsGrid(context, sensorProvider, theme),
-                          const SizedBox(height: 20),
-                          _buildRecommendationsSection(theme),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+  Widget _buildAnimatedBackground() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white,
+            Colors.grey[50]!,
+          ],
         ),
       ),
     );
   }
 
-  // --- AIR QUALITY CARD ---
-  Widget _buildAirQualityCard(
-      BuildContext context, SensorProvider sensorProvider, ThemeData theme) {
-    final aqi = sensorProvider.airQuality.toDouble();
-    final aqiColor = _getAqiColor(aqi);
-    final aqiStatus = _getAqiStatus(aqi);
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          _buildAnimatedBackground(),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Consumer<SensorProvider>(
+                builder: (context, sensorProvider, _) {
+                  if (sensorProvider.isLoading) {
+                    return Center(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.primary.withOpacity(0.2),
+                                    blurRadius: 20,
+                                    spreadRadius: 5,
+                                  ),
+                                ],
+                              ),
+                              child: const CircularProgressIndicator(strokeWidth: 3),
+                            ),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'Loading sensor data...',
+                              style: TextStyle(fontSize: 16, color: Colors.black54, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (sensorProvider.error != null) {
+                    return Center(
+                      child: Container(
+                        margin: const EdgeInsets.all(32),
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              'Connection Error',
+                              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              sensorProvider.error!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: sensorProvider.refreshSensorData,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry Connection'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Check if device is connected
+                  final esp32Provider = context.watch<ESP32Provider>();
+                  final isConnected = esp32Provider.isConnected && 
+                                     esp32Provider.connectedDeviceId != null &&
+                                     sensorProvider.deviceId != null && 
+                                     sensorProvider.error == null;
+                  
+                  if (!isConnected) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.2),
+                                    blurRadius: 15,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.devices_other_outlined,
+                                size: 60,
+                                color: Colors.blueGrey,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              'No Device Connected',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Connect a device to monitor air quality and view real-time data',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 32),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ConnectDeviceScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.add, size: 20),
+                              label: const Text('Connect Device'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  
+                  // Show dashboard only when device is connected
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      await sensorProvider.refreshSensorData();
+                    },
+                    color: AppTheme.primary,
+                    child: CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        _buildModernAppBar(theme, sensorProvider),
+                        SliverToBoxAdapter(
+                          child: FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildDeviceStatusCard(theme, sensorProvider),
+                                  const SizedBox(height: 12),
+                                  _buildAirQualityCard(context, theme),
+                                  const SizedBox(height: 12),
+                                  _buildMetricsGrid(context, theme),
+                                  const SizedBox(height: 12),
+                                  _buildRecommendationsSection(theme, sensorProvider),
+                                  const SizedBox(height: 70),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: FloatingActionButton.extended(
+              backgroundColor: AppTheme.primary,
+              elevation: 4,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ConnectDeviceScreen()),
+                );
+              },
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text('Add Device', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernAppBar(ThemeData theme, SensorProvider sensorProvider) {
+    return SliverAppBar(
+      expandedHeight: 110, // Reduced from 120 to 110
+      floating: false,
+      pinned: true,
+      backgroundColor: const Color(0xFFF8F9FA),
+      elevation: 0,
+      flexibleSpace: LayoutBuilder(
+        builder: (context, constraints) {
+          return FlexibleSpaceBar(
+            titlePadding: const EdgeInsets.only(left: 20, bottom: 8), // Reduced bottom padding
+            title: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: constraints.maxHeight * 0.6, // Limit height to 60% of available space
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.bottomLeft,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dashboard',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 24, // Explicit font size
+                      ),
+                    ),
+                    const SizedBox(height: 2), // Reduced from 4 to 2
+                    Text(
+                      'Monitor your air quality',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.black45,
+                        fontSize: 11, // Slightly smaller font
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
+            onPressed: () {},
+          ),
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  Widget _buildDeviceStatusCard(ThemeData theme, SensorProvider sensorProvider) {
+    final esp32Provider = context.watch<ESP32Provider>();
+    // Check both ESP32 connection status and sensor provider's device ID
+    final isConnected = esp32Provider.isConnected && 
+                       esp32Provider.connectedDeviceId != null &&
+                       sensorProvider.deviceId != null && 
+                       sensorProvider.error == null;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isConnected 
+            ? [const Color(0xFF667EEA), const Color(0xFF764BA2)]
+            : [Colors.grey[400]!, Colors.grey[600]!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: (isConnected ? const Color(0xFF667EEA) : Colors.grey[400]!).withOpacity(0.25),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isConnected ? Icons.check_circle : Icons.error_outline,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      sensorProvider.deviceId ?? 'No Device',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isConnected ? 'Online & Monitoring' : 'Disconnected',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isConnected && sensorProvider.timestamp > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Colors.greenAccent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Live',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          if (isConnected) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () async {
+                  // Store context in a local variable to use after async operations
+                  final currentContext = context;
+                  final messenger = ScaffoldMessenger.of(currentContext);
+                  
+                  // Show confirmation dialog
+                  final confirmed = await showDialog<bool>(
+                    context: currentContext,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('Disconnect Device'),
+                      content: const Text('Are you sure you want to disconnect the current device?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(true),
+                          child: const Text('Disconnect'),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirmed == true) {
+                    try {
+                      // First clear the sensor data
+                      await sensorProvider.clearDeviceData();
+                      
+                      // Then disconnect from the device
+                      await esp32Provider.disconnect();
+                      
+                      if (!mounted) return;
+                      
+                      // Force a refresh of the sensor data to ensure UI updates
+                      await sensorProvider.refreshSensorData();
+                      
+                      // Show success message
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Device disconnected')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('Error disconnecting: ${e.toString()}')),
+                        );
+                      }
+                    }
+                  }
+                },
+                icon: const Icon(Icons.link_off, color: Colors.white, size: 18),
+                label: const Text(
+                  'Disconnect Device',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.2),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAirQualityCard(BuildContext context, ThemeData theme) {
+    final sensorProvider = context.watch<SensorProvider>();
+    final aqi = sensorProvider.airQuality.toDouble();
+    final color = _getAqiColor(aqi);
+    final status = _getAqiStatus(aqi);
+    
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const AirQualityTrendScreen(),
-          ),
-        );
-      },
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AirQualityTrendScreen()),
+      ),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: aqiColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: aqiColor.withValues(alpha: 0.3),
-            width: 1,
+          gradient: LinearGradient(
+            colors: [Colors.white, color.withOpacity(0.05)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.1),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,119 +586,159 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Air Quality Index (AQI)',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w600,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Air Quality Index',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: aqiColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
                   ),
-                  child: Text(
-                    aqiStatus,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: aqiColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: Icon(Icons.air, color: color, size: 32),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  aqi.toStringAsFixed(1),
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    color: aqiColor,
+                  aqi.toStringAsFixed(0),
+                  style: TextStyle(
+                    fontSize: 56,
                     fontWeight: FontWeight.bold,
+                    color: color,
+                    height: 1,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     'AQI',
-                    style: theme.textTheme.titleSmall?.copyWith(
+                    style: TextStyle(
+                      fontSize: 18,
                       color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                const Spacer(),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildAqiProgressBar(aqi, color, theme),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
                 Text(
-                  'View Full Trend',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.primaryColor,
+                  'View Detailed Trend',
+                  style: TextStyle(
+                    color: color,
                     fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(width: 4),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 12,
-                  color: theme.primaryColor,
-                ),
+                Icon(Icons.arrow_forward, size: 16, color: color),
               ],
             ),
-            const SizedBox(height: 8),
-            _buildAqiProgressBar(aqi, aqiColor, theme),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAqiProgressBar(double aqiValue, Color aqiColor, ThemeData theme) {
-    final double progress = (aqiValue / 500).clamp(0.0, 1.0);
-
+  Widget _buildAqiProgressBar(double aqiValue, Color color, ThemeData theme) {
+    final progress = (aqiValue / 500).clamp(0.0, 1.0);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) => Container(
-            height: 8,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(4),
+        Stack(
+          children: [
+            Container(
+              height: 12,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
-            child: Stack(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeInOut,
-                  width: constraints.maxWidth * progress,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF10B981), Color(0xFF3B82F6)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 1000),
+              curve: Curves.easeOutCubic,
+              height: 12,
+              width: MediaQuery.of(context).size.width * progress * 0.85,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color.withOpacity(0.6), color],
                 ),
-              ],
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ),
-        const SizedBox(height: 8),
-        const Row(
+        const SizedBox(height: 12),
+        Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('0', style: TextStyle(fontSize: 10, color: Colors.grey)),
-            Text('50', style: TextStyle(fontSize: 10, color: Colors.grey)),
-            Text('100', style: TextStyle(fontSize: 10, color: Colors.grey)),
-            Text('200', style: TextStyle(fontSize: 10, color: Colors.grey)),
-            Text('300+', style: TextStyle(fontSize: 10, color: Colors.grey)),
+            _buildAqiLabel('0', Colors.green),
+            _buildAqiLabel('50', Colors.yellow[700]!),
+            _buildAqiLabel('100', Colors.orange),
+            _buildAqiLabel('200', Colors.red),
+            _buildAqiLabel('300+', Colors.purple),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildAqiLabel(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -347,196 +752,239 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Color _getAqiColor(double aqi) {
-    if (aqi <= 50) return AppTheme.success;
-    if (aqi <= 100) return Colors.yellow[700]!;
-    if (aqi <= 150) return Colors.orange;
-    if (aqi <= 200) return Colors.red;
-    if (aqi <= 300) return Colors.purple;
-    return Colors.deepPurple[900]!;
+    if (aqi <= 50) return const Color(0xFF10B981);
+    if (aqi <= 100) return const Color(0xFFFBBF24);
+    if (aqi <= 150) return const Color(0xFFF97316);
+    if (aqi <= 200) return const Color(0xFFEF4444);
+    if (aqi <= 300) return const Color(0xFF8B5CF6);
+    return const Color(0xFF6366F1);
   }
 
-  // --- METRICS GRID ---
-  Widget _buildMetricsGrid(
-      BuildContext context, SensorProvider sensorProvider, ThemeData theme) {
+  Widget _buildMetricsGrid(BuildContext context, ThemeData theme) {
+    final sensorProvider = context.watch<SensorProvider>();
+    final pm25 = sensorProvider.pm25;
+    final pm10 = sensorProvider.pm10;
+    final temp = sensorProvider.temperature;
+    final humidity = sensorProvider.humidity;
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: 1.2,
+      childAspectRatio: 1.1,
       children: [
         _buildMetricCard(
-          context: context,
+          context,
+          theme: theme,
           title: 'PM2.5',
-          value: sensorProvider.pm25.toStringAsFixed(1),
+          value: pm25.toStringAsFixed(1),
           unit: 'µg/m³',
-          icon: Icons.air,
-          color: const Color(0xFF3B82F6),
-          isLoading: sensorProvider.isLoading,
+          icon: Icons.blur_circular,
+          gradient: const [Color(0xFF667EEA), Color(0xFF764BA2)],
         ),
         _buildMetricCard(
-          context: context,
+          context,
+          theme: theme,
           title: 'PM10',
-          value: sensorProvider.pm10.toStringAsFixed(1),
+          value: pm10.toStringAsFixed(1),
           unit: 'µg/m³',
-          icon: Icons.air,
-          color: const Color(0xFF8B5CF6),
-          isLoading: sensorProvider.isLoading,
+          icon: Icons.grain,
+          gradient: const [Color(0xFFF093FB), Color(0xFFF5576C)],
         ),
         _buildMetricCard(
-          context: context,
+          context,
+          theme: theme,
           title: 'Temperature',
-          value: sensorProvider.temperature.toStringAsFixed(1),
+          value: temp.toStringAsFixed(1),
           unit: '°C',
-          icon: Icons.thermostat,
-          color: _getTemperatureColor(sensorProvider.temperature),
-          isLoading: sensorProvider.isLoading,
+          icon: Icons.thermostat_outlined,
+          gradient: [_getTemperatureColor(temp), _getTemperatureColor(temp).withOpacity(0.7)],
         ),
         _buildMetricCard(
-          context: context,
+          context,
+          theme: theme,
           title: 'Humidity',
-          value: sensorProvider.humidity.toStringAsFixed(1),
+          value: humidity.toStringAsFixed(1),
           unit: '%',
-          icon: Icons.water_drop,
-          color: _getHumidityColor(sensorProvider.humidity),
-          isLoading: sensorProvider.isLoading,
+          icon: Icons.water_drop_outlined,
+          gradient: [_getHumidityColor(humidity), _getHumidityColor(humidity).withOpacity(0.7)],
         ),
       ],
     );
   }
 
-  Widget _buildMetricCard({
-    required BuildContext context,
+  Widget _buildMetricCard(
+    BuildContext context, {
+    required ThemeData theme,
     required String title,
     required String value,
     required String unit,
     required IconData icon,
-    required Color color,
-    required bool isLoading,
+    required List<Color> gradient,
   }) {
     return Container(
+      height: 160, // Fixed height for consistency
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          colors: [Colors.white, gradient[0].withOpacity(0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: gradient[0].withOpacity(0.15), width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: gradient[0].withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+              Flexible(
+                child: Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                child: Icon(icon, color: color, size: 20),
               ),
-              const Spacer(),
-              Text(
-                title,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: gradient),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: Colors.white, size: 20),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          if (isLoading)
-            Shimmer.fromColors(
-              baseColor: Colors.grey[300]!,
-              highlightColor: Colors.grey[100]!,
-              child: Container(
-                height: 24,
-                width: 60,
-                color: Colors.white,
-              ),
-            )
-          else
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              child: RichText(
-                key: ValueKey(value),
-                text: TextSpan(
-                  text: value,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                  children: [
-                    TextSpan(
-                      text: ' $unit',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
+          const SizedBox(height: 4),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: gradient[0],
+                      height: 1,
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  unit,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[500],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 
-  // --- RECOMMENDATIONS ---
-  Widget _buildRecommendationsSection(ThemeData theme) {
+  Color _getTemperatureColor(double temp) {
+    if (temp < 18) return const Color(0xFF3B82F6);
+    if (temp < 25) return const Color(0xFF10B981);
+    if (temp < 30) return const Color(0xFFF97316);
+    return const Color(0xFFEF4444);
+  }
+
+  Color _getHumidityColor(double humidity) {
+    if (humidity < 30) return const Color(0xFFF97316);
+    if (humidity < 60) return const Color(0xFF10B981);
+    return const Color(0xFF3B82F6);
+  }
+
+  Widget _buildRecommendationsSection(ThemeData theme, SensorProvider sensorProvider) {
+    final aqi = sensorProvider.airQuality.toDouble();
+    
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Recommendations',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: Colors.black87,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child:const Icon(Icons.lightbulb_outline, color: AppTheme.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Recommendations',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           _buildRecommendationItem(
-            'Open Windows',
-            'Ventilate your space for better air circulation',
-            Icons.open_in_new,
-            const Color(0xFF10B981),
+            'Ventilation',
+            aqi < 50 ? 'Air quality is good! Open windows for fresh air' : 'Keep windows closed due to poor air quality',
+            aqi < 50 ? Icons.window : Icons.door_front_door,
+            aqi < 50 ? const Color(0xFF10B981) : const Color(0xFFF97316),
+            aqi < 50,
           ),
           const SizedBox(height: 12),
           _buildRecommendationItem(
-            'Use Air Purifier',
-            'Turn on your air purifier to improve air quality',
-            Icons.air,
-            const Color(0xFF3B82F6),
+            'Air Purifier',
+            aqi > 100 ? 'Turn on purifier - air quality needs improvement' : 'Purifier in standby mode',
+            Icons.air_outlined,
+            aqi > 100 ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
+            aqi > 100,
           ),
           const SizedBox(height: 12),
           _buildRecommendationItem(
-            'Check Filters',
-            'Time to clean or replace your air filters',
-            Icons.filter_alt,
+            'Filter Maintenance',
+            'Check and clean filters regularly for optimal performance',
+            Icons.filter_alt_outlined,
             const Color(0xFF8B5CF6),
+            false,
           ),
         ],
       ),
@@ -544,102 +992,95 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Widget _buildRecommendationItem(
-      String title, String subtitle, IconData icon, Color color) {
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    bool isHighPriority,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.08), color.withOpacity(0.03)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isHighPriority ? color.withOpacity(0.3) : color.withOpacity(0.15),
+          width: isHighPriority ? 2 : 1,
+        ),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
+              gradient: LinearGradient(
+                colors: [color, color.withOpacity(0.8)],
+              ),
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: Colors.white, size: 22),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
                         color: Colors.black87,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14)),
-                const SizedBox(height: 4),
-                Text(subtitle,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (isHighPriority) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'Priority',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: Colors.grey[400]),
+          Icon(Icons.chevron_right_rounded, color: color.withOpacity(0.5), size: 24),
         ],
       ),
-    );
-  }
-}
-
-class _AirQualityStatus extends StatelessWidget {
-  const _AirQualityStatus();
-
-  String _getAqiLabel(int aqiValue) {
-    if (aqiValue <= 50) return 'Good';
-    if (aqiValue <= 100) return 'Moderate';
-    if (aqiValue <= 150) return 'Unhealthy (Sensitive)';
-    if (aqiValue <= 200) return 'Unhealthy';
-    if (aqiValue <= 300) return 'Very Unhealthy';
-    return 'Hazardous';
-  }
-
-  Color _getAqiColor(int aqiValue) {
-    if (aqiValue <= 50) return AppTheme.success;
-    if (aqiValue <= 100) return Colors.yellow[700]!;
-    if (aqiValue <= 150) return Colors.orange;
-    if (aqiValue <= 200) return Colors.red;
-    if (aqiValue <= 300) return Colors.purple;
-    return Colors.deepPurple[900]!;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<SensorProvider>(
-      builder: (context, sensorProvider, _) {
-        final aqiValue = sensorProvider.airQuality;
-        final color = _getAqiColor(aqiValue);
-        final label = _getAqiLabel(aqiValue);
-        
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8, 
-                height: 8, 
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle)
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelMedium
-                    ?.copyWith(color: color, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

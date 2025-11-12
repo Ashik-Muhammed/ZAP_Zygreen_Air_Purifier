@@ -1,93 +1,102 @@
+// lib/services/esp32_service.dart
 import 'dart:async';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:developer' as developer;
+import 'package:firebase_database/firebase_database.dart';
 
 class ESP32Service {
-  static const String _esp32Ip = '192.168.1.100'; // Replace with your ESP32's IP
-  static const int _port = 81; // Default WebSocket port for ESP32
-  
-  WebSocketChannel? _channel;
+  final DatabaseReference _database = FirebaseDatabase.instance.ref();
   final StreamController<Map<String, dynamic>> _dataController = 
       StreamController<Map<String, dynamic>>.broadcast();
-  
+      
+  StreamSubscription<DatabaseEvent>? _dataSubscription;
+  String? _currentDeviceId;
   bool _isConnected = false;
-  
-  // Getter for connection status
+
   bool get isConnected => _isConnected;
-  
-  // Getter for data stream
+  String? get currentDeviceId => _currentDeviceId;
   Stream<Map<String, dynamic>> get sensorDataStream => _dataController.stream;
-  
-  // Initialize WebSocket connection
-  Future<void> connect() async {
+  DatabaseReference get database => _database;
+
+  Future<bool> connectToDevice(String deviceId, {String? userId}) async {
     try {
-      final wsUrl = Uri.parse('ws://$_esp32Ip:$_port');
-      _channel = WebSocketChannel.connect(wsUrl);
+      await disconnect();
+      _currentDeviceId = deviceId;
       
-      _channel!.stream.listen(
-        (data) {
+      // Check if device exists
+      final deviceRef = _database.child('devices/$deviceId');
+      final snapshot = await deviceRef.once();
+      
+      if (!snapshot.snapshot.exists) {
+        developer.log('Device $deviceId not found in database', name: 'ESP32Service');
+        return false;
+      }
+
+      // Listen to device data
+      _dataSubscription = _database
+          .child('devices/$deviceId/latest')
+          .onValue
+          .listen((event) {
+        developer.log('Firebase data received: ${event.snapshot.value}', name: 'ESP32Service');
+        
+        if (event.snapshot.value != null) {
           try {
-            final jsonData = Map<String, dynamic>.from(data as Map);
-            _dataController.add(jsonData);
+            final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+            data['timestamp'] = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
+            
+            // Also get connection info
+            _database.child('devices/$deviceId/connection').once().then((connSnapshot) {
+              if (connSnapshot.snapshot.value != null) {
+                final connData = Map<String, dynamic>.from(connSnapshot.snapshot.value as Map);
+                data.addAll({
+                  'ip': connData['ip'],
+                  'rssi': connData['rssi'],
+                  'ssid': connData['ssid']
+                });
+              }
+              
+              _isConnected = true;
+              _dataController.add(data);
+            });
           } catch (e) {
-            debugPrint('Error parsing sensor data: $e');
+            developer.log('Error parsing data: $e', name: 'ESP32Service', error: e);
+            _dataController.addError(e);
           }
-        },
-        onError: (error) {
-          _isConnected = false;
-          debugPrint('WebSocket error: $error');
-          _reconnect();
-        },
-        onDone: () {
-          _isConnected = false;
-          debugPrint('WebSocket connection closed');
-          _reconnect();
-        },
-        cancelOnError: true,
-      );
-      
-      _isConnected = true;
-      debugPrint('Connected to ESP32 WebSocket');
-      
+        } else {
+          developer.log('Received null data from Firebase', name: 'ESP32Service');
+        }
+      }, onError: (error) {
+        developer.log('Firebase stream error: $error', name: 'ESP32Service', error: error);
+        _isConnected = false;
+        _dataController.addError(error);
+      });
+
+      return true;
     } catch (e) {
       _isConnected = false;
-      debugPrint('Failed to connect to ESP32: $e');
-      _reconnect();
+      _dataController.addError(e);
+      rethrow;
     }
   }
-  
-  // Reconnect with exponential backoff
-  void _reconnect() {
-    const maxReconnectAttempts = 5;
-    int attempts = 0;
+
+  Future<void> sendCommand(String command, dynamic value) async {
+    if (_currentDeviceId == null) {
+      throw Exception('No device connected');
+    }
     
-    Future.delayed(Duration(seconds: 1 << attempts), () {
-      if (attempts < maxReconnectAttempts) {
-        attempts++;
-        debugPrint('Attempting to reconnect (attempt $attempts)...');
-        connect();
-      } else {
-        debugPrint('Max reconnection attempts reached');
-      }
-    });
+    await _database
+        .child('devices/$_currentDeviceId/commands/$command')
+        .set(value);
   }
-  
-  // Close the WebSocket connection
+
   Future<void> disconnect() async {
-    await _channel?.sink.close();
+    await _dataSubscription?.cancel();
+    _dataSubscription = null;
+    _currentDeviceId = null;
     _isConnected = false;
-    await _dataController.close();
   }
-  
-  // Send data to ESP32 if needed
-  void sendData(dynamic data) {
-    if (_isConnected && _channel != null) {
-      _channel!.sink.add(data);
-    }
-  }
-  
-  // Cleanup
+
   void dispose() {
     disconnect();
+    _dataController.close();
   }
 }
