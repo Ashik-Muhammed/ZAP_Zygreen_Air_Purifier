@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:zygreen_air_purifier/providers/esp32_provider.dart';
 import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
+import 'package:zygreen_air_purifier/providers/air_quality_provider.dart';
 import 'package:zygreen_air_purifier/screens/splash_screen.dart';
 import 'package:zygreen_air_purifier/theme/app_theme.dart';
 
@@ -30,6 +31,7 @@ Future<void> main() async {
     // Create providers
     final esp32Provider = ESP32Provider();
     final sensorProvider = SensorProvider();
+    final airQualityProvider = AirQualityProvider();
     
     // Check if we have a saved connection and try to reconnect
     if (esp32Provider.connectedDeviceId != null) {
@@ -48,6 +50,7 @@ Future<void> main() async {
     runApp(
       MultiProvider(
         providers: [
+          ChangeNotifierProvider<AirQualityProvider>.value(value: airQualityProvider),
           ChangeNotifierProvider.value(value: esp32Provider),
           ChangeNotifierProvider.value(value: sensorProvider),
         ],

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:zygreen_air_purifier/theme/app_theme.dart';
+import 'package:intl/intl.dart';
 import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
+import 'package:zygreen_air_purifier/providers/air_quality_provider.dart';
+import 'package:zygreen_air_purifier/models/air_quality_data.dart';
 
 class AirQualityTrendScreen extends StatefulWidget {
   const AirQualityTrendScreen({super.key});
@@ -13,41 +15,61 @@ class AirQualityTrendScreen extends StatefulWidget {
 
 class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
   bool _showPrediction = true;
+  String _selectedTimeRange = '24h';
   
-  // Generate time-based data points
-  List<Map<String, dynamic>> get _aqiData {
+  // Get formatted time range for display
+  String _formatTimeRange(DateTime dateTime) {
     final now = DateTime.now();
-    final data = <Map<String, dynamic>>[];
+    final difference = now.difference(dateTime);
     
-    // Generate 12 data points (2 hours apart)
-    for (int i = 0; i < 12; i++) {
-      final time = now.subtract(Duration(hours: (11 - i) * 2));
-      final hour = time.hour;
-      final period = hour >= 12 ? 'PM' : 'AM';
-      final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-      
-      // Use actual data or generate sample data
-      final value = i < 7 
-          ? 40 + i * 5 // Sample past data
-          : 75 + (i - 7) * 2; // Sample predicted data
-          
-      data.add({
-        'time': '$displayHour $period',
-        'value': value,
-        'predicted': i >= 7,
-      });
+    if (difference.inDays > 1) {
+      return DateFormat('MMM d').format(dateTime);
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else {
+      return DateFormat('h a').format(dateTime);
+    }
+  }
+  
+  // Filter and prepare data based on selected time range
+  List<AirQualityData> _getFilteredData(List<AirQualityData> allData) {
+    final now = DateTime.now();
+    DateTime startTime;
+    
+    switch (_selectedTimeRange) {
+      case '12h':
+        startTime = now.subtract(const Duration(hours: 12));
+        break;
+      case '7d':
+        startTime = now.subtract(const Duration(days: 7));
+        break;
+      case '30d':
+        startTime = now.subtract(const Duration(days: 30));
+        break;
+      case '24h':
+      default:
+        startTime = now.subtract(const Duration(hours: 24));
+        break;
     }
     
-    return data;
+    return allData.where((data) => data.timestamp.isAfter(startTime)).toList();
   }
 
+  // AQI Level Colors (matching the app's theme)
+  static const Color _aqiGood = Color(0xFF00E676);
+  static const Color _aqiModerate = Color(0xFFFFC107);
+  static const Color _aqiUnhealthySensitive = Color(0xFFFF9800);
+  static const Color _aqiUnhealthy = Color(0xFFF44336);
+  static const Color _aqiVeryUnhealthy = Color(0xFF9C27B0);
+  static const Color _aqiHazardous = Color(0xFF7B1FA2);
+  
   Color _getAqiColor(double value) {
-    if (value <= 50) return AppTheme.success;
-    if (value <= 100) return Colors.yellow[700]!;
-    if (value <= 150) return Colors.orange;
-    if (value <= 200) return Colors.red;
-    if (value <= 300) return Colors.purple;
-    return Colors.deepPurple[900]!;
+    if (value <= 50) return _aqiGood;
+    if (value <= 100) return _aqiModerate;
+    if (value <= 150) return _aqiUnhealthySensitive;
+    if (value <= 200) return _aqiUnhealthy;
+    if (value <= 300) return _aqiVeryUnhealthy;
+    return _aqiHazardous;
   }
 
   String _getAqiStatus(double value) {
@@ -58,17 +80,117 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
     if (value <= 300) return 'Very Unhealthy';
     return 'Hazardous';
   }
+  
+  // Helper widget for stat cards
+  Widget _buildStatCard(BuildContext context, String title, String value, Color color) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.hintColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final sensorProvider = Provider.of<SensorProvider>(context);
+    final airQualityProvider = Provider.of<AirQualityProvider>(context);
     final currentAirQuality = sensorProvider.airQuality.toDouble();
+    
+    // Get combined historical and forecast data
+    final allData = [
+      ...airQualityProvider.historicalData,
+      ...airQualityProvider.forecastData,
+    ];
+    
+    // Filter data based on selected time range
+    final filteredData = _getFilteredData(allData);
+    final historicalData = _getFilteredData(airQualityProvider.historicalData);
+    
+    // Calculate statistics
+    final aqiValues = filteredData.map((e) => e.aqi ?? 0).toList();
+    final minAqi = aqiValues.isEmpty ? 0 : aqiValues.reduce((a, b) => a < b ? a : b);
+    final maxAqi = aqiValues.isEmpty ? 0 : aqiValues.reduce((a, b) => a > b ? a : b);
+    final avgAqi = aqiValues.isEmpty ? 0 : aqiValues.reduce((a, b) => a + b) / aqiValues.length;
+    
+    // Calculate trend (comparing current period with previous period)
+    final currentPeriod = historicalData;
+    final previousPeriod = airQualityProvider.historicalData
+        .where((data) => data.timestamp.isBefore(
+            _selectedTimeRange == '24h' 
+                ? DateTime.now().subtract(const Duration(hours: 24))
+                : DateTime.now().subtract(const Duration(days: 7))
+        ))
+        .toList();
+        
+    final currentPeriodAqi = currentPeriod.map((e) => e.aqi ?? 0).toList();
+    final currentAvg = currentPeriodAqi.isEmpty ? 0 : 
+        currentPeriodAqi.reduce((a, b) => a + b) / currentPeriodAqi.length;
+        
+    final previousPeriodAqi = previousPeriod.map((e) => e.aqi ?? 0).toList();
+    final previousAvg = previousPeriodAqi.isEmpty ? 0 : 
+        previousPeriodAqi.reduce((a, b) => a + b) / previousPeriodAqi.length;
+    
+    final trend = previousAvg > 0 ? ((currentAvg - previousAvg) / previousAvg) * 100 : 0;
     
     return Scaffold(
       appBar: AppBar(
         title: const Text('Air Quality Trend'),
         actions: [
+          // Time range selector
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: DropdownButton<String>(
+              value: _selectedTimeRange,
+              underline: const SizedBox(),
+              icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _selectedTimeRange = newValue;
+                  });
+                }
+              },
+              items: <String>['12h', '24h', '7d', '30d']
+                  .map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(
+                    value,
+                    style: const TextStyle(color: Colors.black),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
           IconButton(
             icon: Icon(_showPrediction ? Icons.visibility : Icons.visibility_off),
             onPressed: () {
@@ -76,7 +198,7 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                 _showPrediction = !_showPrediction;
               });
             },
-            tooltip: _showPrediction ? 'Hide Prediction' : 'Show Prediction',
+            tooltip: _showPrediction ? 'Hide Forecast' : 'Show Forecast',
           ),
         ],
       ),
@@ -89,12 +211,19 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _getAqiColor(sensorProvider.airQuality.toDouble()).withValues(alpha: 0.1),
+                color: _getAqiColor(currentAirQuality).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _getAqiColor(sensorProvider.airQuality.toDouble()).withValues(alpha: 0.3),
+                  color: _getAqiColor(currentAirQuality).withValues(alpha: 0.3),
                   width: 1,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,112 +267,137 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
             
             const SizedBox(height: 24),
             
-            // Trend Chart
+            // AQI Chart
+            const SizedBox(height: 24),
             Text(
-              '24-Hour AQI Trend',
-              style: theme.textTheme.titleLarge?.copyWith(
+              'AQI Trend',
+              style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 300,
+              height: 250,
               child: LineChart(
                 LineChartData(
+                  minX: 0,
+                  maxX: filteredData.length > 1 ? (filteredData.length - 1).toDouble() : 1,
+                  minY: (minAqi * 0.9).clamp(0, double.infinity), // Add some padding, ensure non-negative
+                  maxY: (maxAqi * 1.1).clamp(0, double.infinity), // Add some padding, ensure non-negative
                   gridData: FlGridData(
                     show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: 25,
+                    drawVerticalLine: true,
+                    horizontalInterval: maxAqi > minAqi ? (maxAqi - minAqi) / 5 : 10,
                     getDrawingHorizontalLine: (value) => FlLine(
-                      color: Colors.grey[200],
+                      color: theme.dividerColor.withValues(alpha: 0.2),
                       strokeWidth: 1,
-                      dashArray: [4, 4],
+                    ),
+                    getDrawingVerticalLine: (value) => FlLine(
+                      color: theme.dividerColor.withValues(alpha: 0.1),
+                      strokeWidth: 1,
                     ),
                   ),
                   titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        interval: 2,
+                        reservedSize: 30,
+                        interval: filteredData.length > 5 ? (filteredData.length / 5) : 1,
                         getTitlesWidget: (value, meta) {
-                          final index = value.toInt();
-                          if (index >= 0 && index < _aqiData.length) {
+                          if (value.toInt() >= 0 && value.toInt() < filteredData.length) {
                             return Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                _aqiData[index]['time'],
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
+                                _formatTimeRange(filteredData[value.toInt()].timestamp),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.hintColor,
                                 ),
                               ),
                             );
                           }
-                          return const Text('');
+                          return const SizedBox.shrink();
                         },
                       ),
                     ),
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        interval: 50,
+                        interval: maxAqi > minAqi ? (maxAqi - minAqi) / 5 : 10,
                         reservedSize: 40,
                         getTitlesWidget: (value, meta) {
-                          return Text(
-                            value.toInt().toString(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey[600],
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Text(
+                              value.toInt().toString(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.hintColor,
+                              ),
                             ),
                           );
                         },
                       ),
                     ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border.all(
+                      color: theme.dividerColor.withValues(alpha: 0.2),
+                      width: 1,
                     ),
                   ),
-                  borderData: FlBorderData(show: false),
                   lineBarsData: [
-                    // Actual AQI Line
+                    // Historical data line
                     LineChartBarData(
-                      spots: _aqiData
-                          .where((point) => !point['predicted'])
-                          .toList()
-                          .asMap()
-                          .entries
-                          .map((entry) => FlSpot(
-                                entry.key.toDouble(),
-                                entry.value['value'].toDouble(),
-                              ))
-                          .toList(),
+                      spots: List.generate(filteredData.length, (index) {
+                        final dataPoint = filteredData[index];
+                        return FlSpot(
+                          index.toDouble(),
+                          dataPoint.aqi?.toDouble() ?? 0,
+                        );
+                      }),
                       isCurved: true,
-                      color: _getAqiColor(currentAirQuality),
+                      color: theme.primaryColor,
                       barWidth: 3,
                       isStrokeCapRound: true,
-                      dotData: const FlDotData(show: true),
+                      dotData: FlDotData(
+                        show: filteredData.length < 15, // Only show dots for sparse data
+                        getDotPainter: (spot, percent, barData, index) {
+                          return FlDotCirclePainter(
+                            radius: 3,
+                            color: _getAqiColor(spot.y),
+                            strokeWidth: 2,
+                            strokeColor: Colors.white,
+                          );
+                        },
+                      ),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: _getAqiColor(currentAirQuality).withValues(alpha: 0.1),
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.primaryColor.withValues(alpha: 0.2),
+                            theme.primaryColor.withValues(alpha: 0.05),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
                       ),
                     ),
-                    // Predicted AQI Line (dashed)
-                    if (_showPrediction)
+                    // Forecast line (dashed)
+                    if (_showPrediction && airQualityProvider.forecastData.isNotEmpty)
                       LineChartBarData(
-                        spots: _aqiData
-                            .where((point) => point['predicted'] || !_showPrediction)
-                            .toList()
-                            .asMap()
-                            .entries
-                            .map((entry) => FlSpot(
-                                  entry.key.toDouble(),
-                                  entry.value['value'].toDouble(),
-                                ))
-                            .toList(),
+                        spots: List.generate(filteredData.length, (index) {
+                          final dataPoint = filteredData[index];
+                          if (dataPoint.timestamp.isAfter(DateTime.now())) {
+                            return FlSpot(
+                              index.toDouble(),
+                              dataPoint.aqi?.toDouble() ?? 0,
+                            );
+                          }
+                          return FlSpot.nullSpot;
+                        }).where((spot) => spot != FlSpot.nullSpot).toList(),
                         isCurved: true,
                         color: _getAqiColor(currentAirQuality).withValues(alpha: 0.7),
                         barWidth: 2,
@@ -258,6 +412,87 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
             
             const SizedBox(height: 16),
             
+            // Statistics Section
+            const SizedBox(height: 24),
+            Text(
+              'AQI Statistics',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _buildStatCard(
+                  context,
+                  'Min AQI',
+                  minAqi.toStringAsFixed(0),
+                  _getAqiColor(minAqi.toDouble()),
+                ),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  context,
+                  'Avg AQI',
+                  avgAqi.toStringAsFixed(1),
+                  _getAqiColor(avgAqi.toDouble()),
+                ),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  context,
+                  'Max AQI',
+                  maxAqi.toStringAsFixed(0),
+                  _getAqiColor(maxAqi.toDouble()),
+                ),
+              ],
+            ),
+            
+            // Trend Indicator
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.dividerColor.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    trend >= 0 ? Icons.trending_up : Icons.trending_down,
+                    color: trend >= 0 ? Colors.red : Colors.green,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          trend >= 0 ? 'AQI Trend: Increasing' : 'AQI Trend: Improving',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          trend >= 0 
+                              ? '${trend.abs().toStringAsFixed(1)}% higher than previous period'
+                              : '${trend.abs().toStringAsFixed(1)}% lower than previous period',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 24),
             // Legend
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

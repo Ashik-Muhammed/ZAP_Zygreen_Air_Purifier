@@ -7,6 +7,9 @@ import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
 import 'package:zygreen_air_purifier/screens/air_quality_trend_screen.dart';
 import 'package:zygreen_air_purifier/screens/connect_device_screen.dart';
 import 'package:zygreen_air_purifier/providers/esp32_provider.dart';
+import 'package:zygreen_air_purifier/providers/air_quality_provider.dart';
+import 'package:zygreen_air_purifier/widgets/air_quality_forecast_card.dart';
+import 'package:zygreen_air_purifier/models/air_quality_data.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -62,6 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final esp32Provider = Provider.of<ESP32Provider>(context, listen: false);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -70,8 +74,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           _buildAnimatedBackground(),
           LayoutBuilder(
             builder: (context, constraints) {
-              return Consumer<SensorProvider>(
-                builder: (context, sensorProvider, _) {
+              return Consumer2<SensorProvider, AirQualityProvider>(
+                builder: (context, sensorProvider, airQualityProvider, _) {
                   if (sensorProvider.isLoading) {
                     return Center(
                       child: SingleChildScrollView(
@@ -160,8 +164,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     );
                   }
 
+                  // Update air quality data when sensor data changes
+                  final airQualityData = AirQualityData(
+                    timestamp: DateTime.now(),
+                    pm25: sensorProvider.pm25,
+                    pm10: sensorProvider.pm10,
+                    // Using temperature as a placeholder for CO2 and VOC since they're not available
+                    co2: sensorProvider.temperature * 100, // Scale temperature for demo
+                    voc: sensorProvider.humidity * 10, // Scale humidity for demo
+                  );
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    airQualityProvider.addDataPoint(airQualityData);
+                  });
+
                   // Check if device is connected
-                  final esp32Provider = context.watch<ESP32Provider>();
                   final isConnected = esp32Provider.isConnected && 
                                      esp32Provider.connectedDeviceId != null &&
                                      sensorProvider.deviceId != null && 
@@ -266,6 +282,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                   _buildMetricsGrid(context, theme),
                                   const SizedBox(height: 12),
                                   _buildRecommendationsSection(theme, sensorProvider),
+                                  const SizedBox(height: 24),
+                                  if (airQualityProvider.historicalData.isNotEmpty || 
+                                      airQualityProvider.forecastData.isNotEmpty)
+                                    AirQualityForecastCard(
+                                      historicalData: airQualityProvider.historicalData,
+                                      forecastData: airQualityProvider.forecastData,
+                                      isLoading: airQualityProvider.isLoading,
+                                    ),
                                   const SizedBox(height: 70),
                                 ],
                               ),
@@ -278,22 +302,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 },
               );
             },
-          ),
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: FloatingActionButton.extended(
-              backgroundColor: AppTheme.primary,
-              elevation: 4,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ConnectDeviceScreen()),
-                );
-              },
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text('Add Device', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-            ),
           ),
         ],
       ),
@@ -346,6 +354,67 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         },
       ),
       actions: [
+        // Add Device Button with improved styling
+        Container(
+          margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primary, AppTheme.primary.withOpacity(0.8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => const ConnectDeviceScreen(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      const begin = Offset(0.0, 1.0);
+                      const end = Offset.zero;
+                      const curve = Curves.easeInOut;
+                      var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                      var offsetAnimation = animation.drive(tween);
+                      return SlideTransition(position: offsetAnimation, child: child);
+                    },
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
+                    SizedBox(width: 6),
+                    Text(
+                      'Add Device',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
         Container(
           margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
@@ -363,7 +432,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             onPressed: () {},
           ),
         ),
-        const SizedBox(width: 8),
       ],
     );
   }
