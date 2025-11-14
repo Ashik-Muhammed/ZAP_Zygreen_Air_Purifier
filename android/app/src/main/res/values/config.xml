@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="firebase_ml_model_downloader_enable_buildconfig">true</bool>
+</resources>

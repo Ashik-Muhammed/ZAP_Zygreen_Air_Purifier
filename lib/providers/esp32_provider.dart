@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zygreen_air_purifier/services/esp32_service.dart';
 
 class ESP32Provider with ChangeNotifier {
@@ -25,8 +27,11 @@ class ESP32Provider with ChangeNotifier {
   String? get firmwareVersion => _firmwareVersion;
   String? get deviceIp => _deviceIp;
 
+  static const String _prefsKey = 'esp32_connection_state';
+  
   ESP32Provider() {
     _init();
+    _loadConnectionState();
   }
 
   void _init() {
@@ -51,6 +56,39 @@ class ESP32Provider with ChangeNotifier {
     );
   }
 
+  // Save connection state to shared preferences
+  Future<void> _saveConnectionState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final state = {
+      'isConnected': _isConnected,
+      'deviceId': _connectedDeviceId,
+      'firmwareVersion': _firmwareVersion,
+      'deviceIp': _deviceIp,
+    };
+    await prefs.setString(_prefsKey, jsonEncode(state));
+  }
+
+  // Load connection state from shared preferences
+  Future<void> _loadConnectionState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stateJson = prefs.getString(_prefsKey);
+      if (stateJson != null) {
+        final state = jsonDecode(stateJson) as Map<String, dynamic>;
+        if (state['isConnected'] == true && state['deviceId'] != null) {
+          // Don't auto-connect here, just restore the state
+          _isConnected = state['isConnected'];
+          _connectedDeviceId = state['deviceId'];
+          _firmwareVersion = state['firmwareVersion'];
+          _deviceIp = state['deviceIp'];
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading connection state: $e');
+    }
+  }
+
   // Connect to a specific ESP32 device
   Future<bool> connectToDevice(String deviceId, {String? userId}) async {
     try {
@@ -73,6 +111,9 @@ class ESP32Provider with ChangeNotifier {
         
         // Get device info
         await _fetchDeviceInfo(deviceId);
+        
+        // Save connection state
+        await _saveConnectionState();
         
         // Notify listeners after all updates are complete
         notifyListeners();
@@ -135,6 +176,11 @@ class ESP32Provider with ChangeNotifier {
     _firmwareVersion = null;
     _deviceIp = null;
     _sensorData = {};
+    
+    // Clear saved connection state
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsKey);
+    
     notifyListeners();
   }
 

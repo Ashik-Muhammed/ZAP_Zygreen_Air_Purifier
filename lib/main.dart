@@ -6,21 +6,70 @@ import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
 import 'package:zygreen_air_purifier/screens/splash_screen.dart';
 import 'package:zygreen_air_purifier/theme/app_theme.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyCU5jQjKRHRni2rqrTjhQY7ZNW91OkcH_s",
-      appId: "1:501260037462:web:2cc0d81dd61664c7a23af7",
-      messagingSenderId: "501260037462",
-      projectId: "zygreeen",
-      storageBucket: "zygreeen.firebasestorage.app",
-      authDomain: "zygreeen.firebaseapp.com",
-      databaseURL: "https://zygreeen-default-rtdb.asia-southeast1.firebasedatabase.app",
-      measurementId: "G-DCRFKL21Y4",
-    ),
-  );
-  runApp(const MyApp());
+  
+  try {
+    // Initialize Firebase
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        name: 'ZygreenAirPurifier',
+        options: const FirebaseOptions(
+          apiKey: "AIzaSyCU5jQjKRHRni2rqrTjhQY7ZNW91OkcH_s",
+          appId: "1:501260037462:web:2cc0d81dd61664c7a23af7",
+          messagingSenderId: "501260037462",
+          projectId: "zygreeen",
+          storageBucket: "zygreeen.firebasestorage.app",
+          authDomain: "zygreeen.firebaseapp.com",
+          databaseURL: "https://zygreeen-default-rtdb.asia-southeast1.firebasedatabase.app",
+          measurementId: "G-DCRFKL21Y4",
+        ),
+      );
+    }
+    
+    // Create providers
+    final esp32Provider = ESP32Provider();
+    final sensorProvider = SensorProvider();
+    
+    // Check if we have a saved connection and try to reconnect
+    if (esp32Provider.connectedDeviceId != null) {
+      try {
+        await esp32Provider.connectToDevice(esp32Provider.connectedDeviceId!);
+        if (esp32Provider.isConnected) {
+          // Initialize sensor data if connected
+          await sensorProvider.initSensorData();
+        }
+      } catch (e) {
+        debugPrint('Error reconnecting to device: $e');
+      }
+    }
+    
+    // Run the app with providers
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: esp32Provider),
+          ChangeNotifierProvider.value(value: sensorProvider),
+        ],
+        child: const MyApp(),
+      ),
+    );
+  } catch (e) {
+    debugPrint('Error initializing app: $e');
+    runApp(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Text(
+              'Error initializing app. Please restart the application.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -28,17 +77,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ESP32Provider()),
-        ChangeNotifierProvider(create: (_) => SensorProvider()),
-      ],
-      child: MaterialApp(
-        title: 'Zygreen Air Purifier',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        home: const SplashScreen(),
-      ),
+    return MaterialApp(
+      title: 'Zygreen Air Purifier',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: const SplashScreen(),
     );
   }
 }
