@@ -33,14 +33,15 @@ class AirQualityForecast {
       }
       
       // Add some randomness to simulate real-world variations
-      final randomFactor = 0.95 + Random().nextDouble() * 0.1;
+      // Consider: pass Random instance as parameter or make predictions deterministic
+      const randomFactor = 1.0; // Or remove if not needed
       
       predictions.add(AirQualityData(
         timestamp: lastData.timestamp.add(Duration(hours: i)),
-        pm25: (weightedSumPm25 / weightSum) * randomFactor * (1 + (i * 0.02)),
-        pm10: (weightedSumPm10 / weightSum) * randomFactor * (1 + (i * 0.018)),
-        co2: (weightedSumCo2 / weightSum) * randomFactor * (1 + (i * 0.01)),
-        voc: (weightedSumVoc / weightSum) * randomFactor * (1 + (i * 0.01)),
+        pm25: (weightedSumPm25 / weightSum) * randomFactor,
+        pm10: (weightedSumPm10 / weightSum) * randomFactor,
+        co2: (weightedSumCo2 / weightSum) * randomFactor,
+        voc: (weightedSumVoc / weightSum) * randomFactor,
         isPrediction: true,
       ));
     }

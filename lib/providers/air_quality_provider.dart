@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,17 +12,37 @@ class AirQualityProvider with ChangeNotifier {
   List<AirQualityData> _historicalData = [];
   List<AirQualityData> _forecastData = [];
   bool _isLoading = false;
+  bool _isInitialized = false;
   String? _error;
   
-  AirQualityProvider() {
-    _loadHistoricalData();
-  }
+  AirQualityProvider();
   
   // Getters
-  List<AirQualityData> get historicalData => _historicalData;
-  List<AirQualityData> get forecastData => _forecastData;
+  UnmodifiableListView<AirQualityData> get historicalData => UnmodifiableListView(_historicalData);
+  UnmodifiableListView<AirQualityData> get forecastData => UnmodifiableListView(_forecastData);
   bool get isLoading => _isLoading;
+  bool get isInitialized => _isInitialized;
   String? get error => _error;
+  
+  /// Initialize the provider by loading historical data.
+  /// Must be called before using the provider.
+  Future<void> init() async {
+    if (_isInitialized) return;
+    
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      await _loadHistoricalData();
+      _isInitialized = true;
+    } catch (e) {
+      _error = 'Failed to initialize AirQualityProvider: $e';
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
   
   // Load historical data from local storage
   Future<void> _loadHistoricalData() async {
@@ -34,10 +55,17 @@ class AirQualityProvider with ChangeNotifier {
         _historicalData = jsonList
             .map((item) => AirQualityData.fromJson(Map<String, dynamic>.from(item)))
             .toList();
-        _generateForecast();
+        
+        // Notify listeners about the loaded historical data
+        notifyListeners();
+        
+        // Generate and await forecast
+        await _generateForecast();
       }
     } catch (e) {
-      debugPrint('Error loading historical data: $e');
+      _error = 'Error loading historical data: $e';
+      debugPrint(_error);
+      rethrow;
     }
   }
   
@@ -68,13 +96,25 @@ class AirQualityProvider with ChangeNotifier {
   Future<void> updateData(List<AirQualityData> newData) async {
     if (listEquals(_historicalData, newData)) return;
     
-    _historicalData = newData;
-    await _saveHistoricalData();
+    // Set loading state before any async operations
     _isLoading = true;
     _error = null;
     notifyListeners();
     
-    await _generateForecast();
+    try {
+      // Update data and save
+      _historicalData = List<AirQualityData>.from(newData);
+      await _saveHistoricalData();
+      
+      // Generate forecast
+      await _generateForecast();
+    } catch (e) {
+      _error = 'Failed to update data: $e';
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
   
   // Generate forecast based on historical data

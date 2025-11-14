@@ -33,17 +33,25 @@ Future<void> main() async {
     final sensorProvider = SensorProvider();
     final airQualityProvider = AirQualityProvider();
     
-    // Check if we have a saved connection and try to reconnect
-    if (esp32Provider.connectedDeviceId != null) {
-      try {
-        await esp32Provider.connectToDevice(esp32Provider.connectedDeviceId!);
-        if (esp32Provider.isConnected) {
-          // Initialize sensor data if connected
-          await sensorProvider.initSensorData();
+    try {
+      // Initialize air quality provider first
+      await airQualityProvider.init();
+      
+      // Check if we have a saved connection and try to reconnect
+      if (esp32Provider.connectedDeviceId != null) {
+        try {
+          await esp32Provider.connectToDevice(esp32Provider.connectedDeviceId!);
+          if (esp32Provider.isConnected) {
+            // Initialize sensor data if connected
+            await sensorProvider.initSensorData();
+          }
+        } catch (e) {
+          debugPrint('Error reconnecting to device: $e');
         }
-      } catch (e) {
-        debugPrint('Error reconnecting to device: $e');
       }
+    } catch (e) {
+      debugPrint('Error initializing AirQualityProvider: $e');
+      // Continue running the app even if air quality data fails to load
     }
     
     // Run the app with providers
