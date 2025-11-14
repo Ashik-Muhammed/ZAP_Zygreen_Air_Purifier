@@ -50,10 +50,9 @@ Future<void> main() async {
         }
       }
     } catch (e) {
-      debugPrint('Error initializing AirQualityProvider: $e');
-      // Continue running the app even if air quality data fails to load
-    }
-    
+      debugPrint('Error during provider initialization: $e');
+      // Continue running the app even if initialization fails
+    }    
     // Run the app with providers
     runApp(
       MultiProvider(

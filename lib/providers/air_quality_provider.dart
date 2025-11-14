@@ -55,12 +55,8 @@ class AirQualityProvider with ChangeNotifier {
         _historicalData = jsonList
             .map((item) => AirQualityData.fromJson(Map<String, dynamic>.from(item)))
             .toList();
-        
-        // Notify listeners about the loaded historical data
-        notifyListeners();
-        
-        // Generate and await forecast
-        await _generateForecast();
+         // Generate and await forecast
+         await _generateForecast();
       }
     } catch (e) {
       _error = 'Error loading historical data: $e';
@@ -94,26 +90,22 @@ class AirQualityProvider with ChangeNotifier {
   
   // Update historical data and generate forecast
   Future<void> updateData(List<AirQualityData> newData) async {
-    if (listEquals(_historicalData, newData)) return;
+    if (!_isInitialized) {
+      throw StateError('AirQualityProvider must be initialized before use. Call init() first.');
+    }
     
-    // Set loading state before any async operations
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    if (listEquals(_historicalData, newData)) return;
     
     try {
       // Update data and save
       _historicalData = List<AirQualityData>.from(newData);
       await _saveHistoricalData();
       
-      // Generate forecast
+      // Generate forecast (will handle its own loading state)
       await _generateForecast();
     } catch (e) {
       _error = 'Failed to update data: $e';
       rethrow;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
   }
   
