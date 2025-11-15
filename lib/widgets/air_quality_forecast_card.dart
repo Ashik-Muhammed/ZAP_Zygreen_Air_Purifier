@@ -74,7 +74,7 @@ class AirQualityForecastCard extends StatelessWidget {
             const SizedBox(height: 16),
             _buildCurrentStatus(theme, currentAqi, forecastAqi),
             const SizedBox(height: 24),
-            _buildHourlyForecast(theme, forecastData),
+            _buildHourlyForecast(theme, context),
             const SizedBox(height: 16),
             _buildForecastSummary(theme, isImproving, difference.abs().toInt()),
           ],
@@ -122,7 +122,7 @@ class AirQualityForecastCard extends StatelessWidget {
   }
 
   // Helper method to get AQI color based on AQI value
-  Color getAqiColor(int aqi) {
+  static Color _getAqiColor(int aqi) {
     if (aqi <= 50) return _aqiGood;
     if (aqi <= 100) return _aqiModerate;
     if (aqi <= 150) return _aqiUnhealthySensitive;
@@ -135,9 +135,9 @@ class AirQualityForecastCard extends StatelessWidget {
 
     return Row(
       children: [
-        _buildAqiIndicator('Current', currentAqi, getAqiColor(currentAqi), theme),
+        _buildAqiIndicator('Current', currentAqi, AirQualityForecastCard._getAqiColor(currentAqi), theme),
         const SizedBox(width: 16),
-        _buildAqiIndicator('Forecast', forecastAqi, getAqiColor(forecastAqi), theme),
+        _buildAqiIndicator('Forecast', forecastAqi, AirQualityForecastCard._getAqiColor(forecastAqi), theme),
       ],
     );
   }
@@ -187,7 +187,9 @@ class AirQualityForecastCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHourlyForecast(ThemeData theme, List<AirQualityData> forecastData) {
+  Widget _buildHourlyForecast(ThemeData theme, BuildContext context) {
+    // Get the current locale from the BuildContext
+    final locale = Localizations.localeOf(context).toString();
     // Take up to 6 hours of forecast data
     final hourlyData = forecastData.take(6).toList();
     
@@ -210,9 +212,10 @@ class AirQualityForecastCard extends StatelessWidget {
             separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final data = hourlyData[index];
-              final time = DateFormat('ha').format(data.timestamp);
+              // Use locale-aware time format (12/24h based on device settings)
+              final time = DateFormat.j(locale).format(data.timestamp);
               final aqi = data.aqi ?? 0;
-              final color = getAqiColor(aqi);
+              final color = _getAqiColor(aqi);
               
               return Container(
                 width: 70,

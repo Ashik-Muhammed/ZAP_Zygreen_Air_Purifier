@@ -315,12 +315,19 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                   maxX: filteredData.isNotEmpty ? (filteredData.length - 1).toDouble() : 1,
                   lineTouchData: LineTouchData(
                     touchTooltipData: LineTouchTooltipData(
-                      tooltipBgColor: theme.cardColor.withValues(alpha: 0.9 * 255).withValues(alpha: 1),
+                      tooltipBgColor: theme.cardColor.withValues(alpha: 0.9 * 255),
                       tooltipRoundedRadius: 8,
                       getTooltipItems: (List<LineBarSpot> touchedSpots) {
                         return touchedSpots.map((spot) {
-                          final text = '${_formatTimeRange(historicalData[spot.spotIndex].timestamp)}\n'
-'${spot.y.toStringAsFixed(1)} AQI';
+                          // Get the original data index from the x-coordinate
+                          final dataIndex = spot.x.toInt();
+                          // Ensure the index is within bounds
+                          final isIndexValid = dataIndex >= 0 && dataIndex < historicalData.length;
+                          final timestamp = isIndexValid 
+                              ? _formatTimeRange(historicalData[dataIndex].timestamp)
+                              : 'Unknown time';
+                              
+                          final text = '$timestamp\n${spot.y.toStringAsFixed(1)} AQI';
                           return LineTooltipItem(
                             text,
                             theme.textTheme.bodyMedium!,
@@ -348,7 +355,7 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                       } else if (touchResponse?.lineBarSpots != null) {
                         setState(() {
                           _touchedIndices = touchResponse!.lineBarSpots!
-                              .map((spot) => spot.spotIndex)
+                              .map((spot) => spot.x.toInt()) // Store original data index
                               .toList();
                         });
                       }
@@ -446,9 +453,8 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                       dotData: FlDotData(
                         show: true,
                         getDotPainter: (spot, percent, barData, index) {
-                          final isTouched = _touchedIndices.any((i) => 
-                            i >= spot.x - 0.5 && i <= spot.x + 0.5
-                          );
+                          final dataIndex = spot.x.toInt();
+                          final isTouched = _touchedIndices.contains(dataIndex);
                           return FlDotCirclePainter(
                             radius: isTouched ? 5 : 0, // Only show dot when touched
                             color: _getAqiColor(spot.y),
@@ -458,10 +464,10 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                         },
                         checkToShowDot: (spot, barData) {
                           // Only show dot for the first, last, and touched points
-                          final spotIndex = spot.x.toInt();
-                          return spotIndex == 0 || 
-                                 spotIndex == historicalData.length - 1 ||
-                                 _touchedIndices.any((i) => i >= spot.x - 0.5 && i <= spot.x + 0.5);
+                          final dataIndex = spot.x.toInt();
+                          return dataIndex == 0 || 
+                                 dataIndex == historicalData.length - 1 ||
+                                 _touchedIndices.any((i) => i == dataIndex);
                         },
                       ),
                       belowBarData: BarAreaData(
