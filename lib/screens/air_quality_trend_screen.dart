@@ -315,16 +315,16 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                   maxX: filteredData.isNotEmpty ? (filteredData.length - 1).toDouble() : 1,
                   lineTouchData: LineTouchData(
                     touchTooltipData: LineTouchTooltipData(
-                      tooltipBgColor: theme.cardColor.withValues(alpha: 0.9 * 255),
+                      tooltipBgColor: theme.cardColor.withValues(alpha: 0.9),
                       tooltipRoundedRadius: 8,
                       getTooltipItems: (List<LineBarSpot> touchedSpots) {
                         return touchedSpots.map((spot) {
                           // Get the original data index from the x-coordinate
                           final dataIndex = spot.x.toInt();
                           // Ensure the index is within bounds
-                          final isIndexValid = dataIndex >= 0 && dataIndex < historicalData.length;
+                          final isIndexValid = dataIndex >= 0 && dataIndex < filteredData.length;
                           final timestamp = isIndexValid 
-                              ? _formatTimeRange(historicalData[dataIndex].timestamp)
+                              ? _formatTimeRange(filteredData[dataIndex].timestamp)
                               : 'Unknown time';
                               
                           final text = '$timestamp\n${spot.y.toStringAsFixed(1)} AQI';

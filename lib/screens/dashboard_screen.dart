@@ -1121,13 +1121,36 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildRecommendationsSection(ThemeData theme, SensorProvider sensorProvider) {
     final aqi = sensorProvider.airQuality.toDouble();
+    final temp = sensorProvider.temperature;
+    final humidity = sensorProvider.humidity;
+    final pm25 = sensorProvider.pm25;
+    final hour = DateTime.now().hour;
+    final isDaytime = hour >= 6 && hour < 18;
+
+    // More granular AQI categories
+    final isGoodAir = aqi <= 50;
+    final isModerate = aqi > 50 && aqi <= 100;
+    final isUnhealthySensitive = aqi > 100 && aqi <= 150;
+    final isUnhealthy = aqi > 150 && aqi <= 200;
+    final isVeryUnhealthy = aqi > 200 && aqi <= 300;
+    final isHazardous = aqi > 300;
+
+    // Time-based greetings
+    String greeting;
+    if (hour < 12) {
+      greeting = 'Good morning';
+    } else if (hour < 17) {
+      greeting = 'Good afternoon';
+    } else {
+      greeting = 'Good evening';
+    }
     
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -1145,48 +1168,134 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.1),
+                  color: theme.primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child:const Icon(Icons.lightbulb_outline, color: AppTheme.primary, size: 24),
+                child: Icon(Icons.lightbulb_outline, color: theme.primaryColor, size: 24),
               ),
               const SizedBox(width: 12),
-              Text(
-                'Recommendations',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: Colors.black87,
-                  fontWeight: FontWeight.bold,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$greeting!',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Smart Recommendations',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 20),
+          
+          // Air Quality Recommendation
+          _buildRecommendationItem(
+            'Air Quality',
+            _getAirQualityRecommendation(aqi, isDaytime),
+            _getAirQualityIcon(aqi),
+            _getAirQualityColor(aqi),
+            isUnhealthy || isVeryUnhealthy || isHazardous,
+          ),
+          const SizedBox(height: 12),
+          
+          // Ventilation Recommendation
           _buildRecommendationItem(
             'Ventilation',
-            aqi < 50 ? 'Air quality is good! Open windows for fresh air' : 'Keep windows closed due to poor air quality',
-            aqi < 50 ? Icons.window : Icons.door_front_door,
-            aqi < 50 ? const Color(0xFF10B981) : const Color(0xFFF97316),
-            aqi < 50,
+            _getVentilationRecommendation(aqi, pm25, temp, humidity, isDaytime),
+            _getVentilationIcon(aqi, isDaytime),
+            _getVentilationColor(aqi),
+            isGoodAir || isModerate,
           ),
           const SizedBox(height: 12),
+          
+          // Health Tips
           _buildRecommendationItem(
-            'Air Purifier',
-            aqi > 100 ? 'Turn on purifier - air quality needs improvement' : 'Purifier in standby mode',
-            Icons.air_outlined,
-            aqi > 100 ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
-            aqi > 100,
-          ),
-          const SizedBox(height: 12),
-          _buildRecommendationItem(
-            'Filter Maintenance',
-            'Check and clean filters regularly for optimal performance',
-            Icons.filter_alt_outlined,
+            'Health Tips',
+            _getHealthTip(aqi, pm25, temp, humidity),
+            Icons.health_and_safety_outlined,
             const Color(0xFF8B5CF6),
-            false,
+            isUnhealthy || isVeryUnhealthy || isHazardous,
           ),
         ],
       ),
     );
+  }
+  
+  // Helper methods for recommendations
+  String _getAirQualityRecommendation(double aqi, bool isDaytime) {
+    if (aqi <= 50) {
+      return 'Air quality is excellent! Perfect for outdoor activities.';
+    } else if (aqi <= 100) {
+      return 'Air quality is acceptable. Most people can enjoy normal activities.';
+    } else if (aqi <= 150) {
+      return 'Sensitive groups should reduce outdoor exertion.';
+    } else if (aqi <= 200) {
+      return 'Everyone may begin to experience health effects.';
+    } else if (aqi <= 300) {
+      return 'Health alert: Everyone may experience more serious health effects.';
+    } else {
+      return 'Health warning of emergency conditions. Avoid all physical activity outdoors.';
+    }
+  }
+
+  String _getVentilationRecommendation(double aqi, double pm25, double temp, double humidity, bool isDaytime) {
+    if (aqi > 100 || pm25 > 35) {
+      return 'Keep windows closed and use air purifier.';
+    } else if (temp > 30 && humidity > 70) {
+      return 'Use air conditioning to reduce humidity and maintain comfort.';
+    } else if (isDaytime && temp > 20 && temp < 28) {
+      return 'Good time to open windows for ventilation.';
+    } else {
+      return 'Consider natural ventilation during cooler hours.';
+    }
+  }
+
+  String _getHealthTip(double aqi, double pm25, double temp, double humidity) {
+    if (aqi > 150) {
+      return 'Wear N95 mask if going outside. Limit outdoor activities.';
+    } else if (pm25 > 35) {
+      return 'Consider using an air purifier. Keep windows closed.';
+    } else if (temp > 30) {
+      return 'Stay hydrated and avoid direct sun exposure.';
+    } else if (humidity > 80) {
+      return 'High humidity can promote mold growth. Use a dehumidifier if needed.';
+    } else {
+      return 'Ideal conditions for outdoor activities. Enjoy the fresh air!';
+    }
+  }
+
+  IconData _getAirQualityIcon(double aqi) {
+    if (aqi <= 50) return Icons.air_outlined;
+    if (aqi <= 100) return Icons.air_outlined;
+    if (aqi <= 150) return Icons.air_outlined;
+    if (aqi <= 200) return Icons.air_outlined;
+    return Icons.air_outlined;
+  }
+
+  IconData _getVentilationIcon(double aqi, bool isDaytime) {
+    if (aqi > 100) return Icons.door_front_door;
+    return isDaytime ? Icons.window : Icons.nightlight_round;
+  }
+
+  Color _getAirQualityColor(double aqi) {
+    if (aqi <= 50) return const Color(0xFF10B981); // Green
+    if (aqi <= 100) return const Color(0xFF3B82F6); // Blue
+    if (aqi <= 150) return const Color(0xFFF59E0B); // Yellow
+    if (aqi <= 200) return const Color(0xFFEF4444); // Red
+    if (aqi <= 300) return const Color(0xFF8B5CF6); // Purple
+    return const Color(0xFF7F1D1D); // Dark Red
+  }
+
+  Color _getVentilationColor(double aqi) {
+    return aqi > 100 ? const Color(0xFFEF4444) : const Color(0xFF10B981);
   }
 
   Widget _buildRecommendationItem(
