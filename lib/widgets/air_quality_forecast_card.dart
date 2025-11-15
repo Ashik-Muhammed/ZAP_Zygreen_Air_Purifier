@@ -1,8 +1,7 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:zygreen_air_purifier/models/air_quality_data.dart';
-import 'package:intl/intl.dart';
 import 'package:zygreen_air_purifier/theme/app_theme.dart';
+import 'package:intl/intl.dart';
 
 class AirQualityForecastCard extends StatelessWidget {
   final List<AirQualityData> historicalData;
@@ -75,13 +74,8 @@ class AirQualityForecastCard extends StatelessWidget {
             const SizedBox(height: 16),
             _buildCurrentStatus(theme, currentAqi, forecastAqi),
             const SizedBox(height: 24),
-            SizedBox(
-              height: 180,
-              child: _buildForecastChart(theme),
-            ),
+            _buildHourlyForecast(theme, forecastData),
             const SizedBox(height: 16),
-            _buildHourlyForecast(theme),
-            const SizedBox(height: 8),
             _buildForecastSummary(theme, isImproving, difference.abs().toInt()),
           ],
         ),
@@ -127,34 +121,17 @@ class AirQualityForecastCard extends StatelessWidget {
     );
   }
 
-  Widget _buildForecastChart(ThemeData theme) {
-    if (historicalData.isEmpty && forecastData.isEmpty) return const SizedBox();
-    
-    final allData = [...historicalData, ...forecastData];
-    final pmValues = allData.map((e) => e.pm25 ?? 0).toList();
-    final minPm = pmValues.reduce((a, b) => a < b ? a : b);
-    final maxPm = pmValues.reduce((a, b) => a > b ? a : b);
-
-    return CustomPaint(
-      painter: _ForecastChartPainter(
-        historicalData: historicalData,
-        forecastData: forecastData,
-        minValue: minPm,
-        maxValue: maxPm,
-        theme: theme,
-      ),
-    );
+  // Helper method to get AQI color based on AQI value
+  Color getAqiColor(int aqi) {
+    if (aqi <= 50) return _aqiGood;
+    if (aqi <= 100) return _aqiModerate;
+    if (aqi <= 150) return _aqiUnhealthySensitive;
+    if (aqi <= 200) return _aqiUnhealthy;
+    if (aqi <= 300) return _aqiVeryUnhealthy;
+    return _aqiHazardous;
   }
 
   Widget _buildCurrentStatus(ThemeData theme, int currentAqi, int forecastAqi) {
-    Color getAqiColor(int aqi) {
-      if (aqi <= 50) return _aqiGood;
-      if (aqi <= 100) return _aqiModerate;
-      if (aqi <= 150) return _aqiUnhealthySensitive;
-      if (aqi <= 200) return _aqiUnhealthy;
-      if (aqi <= 300) return _aqiVeryUnhealthy;
-      return _aqiHazardous;
-    }
 
     return Row(
       children: [
@@ -170,9 +147,9 @@ class AirQualityForecastCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppTheme.primary.withValues(alpha: 0.7),
+          color: AppTheme.primary.withAlpha(25),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          border: Border.all(color: color.withAlpha(100)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,7 +157,7 @@ class AirQualityForecastCard extends StatelessWidget {
             Text(
               label,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                color: theme.colorScheme.onSurface.withAlpha(179), // 0.7 * 255 ≈ 179
               ),
             ),
             const SizedBox(height: 4),
@@ -210,73 +187,93 @@ class AirQualityForecastCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHourlyForecast(ThemeData theme) {
-    // Show next 6 hours forecast
-    final hourlyForecast = forecastData.length > 6 
-        ? forecastData.sublist(0, 6)
-        : forecastData;
-
-    return SizedBox(
-      height: 80,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: hourlyForecast.length,
-        itemBuilder: (context, index) {
-          final data = hourlyForecast[index];
-          final aqi = data.aqi ?? 0;
-          final time = DateFormat('ha').format(data.timestamp);
-          
-          return Container(
-            width: 60,
-            margin: const EdgeInsets.only(right: 8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  time,
-                  style: theme.textTheme.bodySmall,
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: _getAqiColor(aqi).withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: _getAqiColor(aqi),
-                      width: 1.5,
-                    ),
+  Widget _buildHourlyForecast(ThemeData theme, List<AirQualityData> forecastData) {
+    // Take up to 6 hours of forecast data
+    final hourlyData = forecastData.take(6).toList();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Hourly Forecast',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 100,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: hourlyData.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final data = hourlyData[index];
+              final time = DateFormat('ha').format(data.timestamp);
+              final aqi = data.aqi ?? 0;
+              final color = getAqiColor(aqi);
+              
+              return Container(
+                width: 70,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.dividerColor.withAlpha(50),
+                    width: 1,
                   ),
-                  child: Center(
-                    child: Text(
-                      aqi.toString(),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: _getAqiColor(aqi),
-                        fontWeight: FontWeight.bold,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(20),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      time,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withAlpha(200),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: color.withAlpha(30),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: color.withAlpha(150),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        aqi.toString(),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  Color _getAqiColor(int aqi) {
-    if (aqi <= 50) return _aqiGood;
-    if (aqi <= 100) return _aqiModerate;
-    if (aqi <= 150) return _aqiUnhealthySensitive;
-    if (aqi <= 200) return _aqiUnhealthy;
-    if (aqi <= 300) return _aqiVeryUnhealthy;
-    return _aqiHazardous;
-  }
-
-
   Widget _buildForecastSummary(ThemeData theme, bool isImproving, int difference) {
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -325,7 +322,7 @@ class AirQualityForecastCard extends StatelessWidget {
                       ? 'Expected improvement of $difference AQI points in the next few hours.'
                       : 'Expected increase of $difference AQI points. Consider taking precautions.',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: theme.colorScheme.onSurface.withAlpha(179), // 0.7 * 255 ≈ 179
                   ),
                 ),
               ],
@@ -335,215 +332,4 @@ class AirQualityForecastCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ForecastChartPainter extends CustomPainter {
-  final List<AirQualityData> historicalData;
-  final List<AirQualityData> forecastData;
-  final double minValue;
-  final double maxValue;
-  final ThemeData theme;
-  
-  static const double padding = 24.0;
-  static const double pointRadius = 4.0;
-  
-  _ForecastChartPainter({
-    required this.historicalData,
-    required this.forecastData,
-    required this.minValue,
-    required this.maxValue,
-    required this.theme,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (historicalData.isEmpty && forecastData.isEmpty) return;
-    
-    final allData = [...historicalData, ...forecastData];
-    final valueRange = (maxValue - minValue).clamp(1.0, double.infinity);
-    
-    // Draw grid lines
-    final gridPaint = Paint()
-      ..color = theme.dividerColor.withValues(alpha: 0.2)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-    
-    // Draw horizontal grid lines
-    const horizontalLines = 5;
-    for (var i = 0; i <= horizontalLines; i++) {
-      final y = size.height - (i * size.height / horizontalLines);
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        gridPaint,
-      );
-    }
-    
-    // Draw vertical grid lines
-    final verticalLines = min(6, allData.length - 1);
-    if (verticalLines > 0) {
-      for (var i = 0; i <= verticalLines; i++) {
-        final x = (i * size.width / verticalLines);
-        canvas.drawLine(
-          Offset(x, 0),
-          Offset(x, size.height),
-          gridPaint,
-        );
-      }
-    }
-    
-    // Draw grid lines
-    _drawGrid(canvas, size, valueRange);
-    
-    // Draw historical data line
-    if (historicalData.length > 1) {
-      _drawLine(
-        canvas,
-        size,
-        historicalData,
-        minValue,
-        valueRange,
-        theme.primaryColor,
-        false,
-      );
-    }
-    
-    // Draw forecast line
-    if (forecastData.length > 1) {
-      _drawLine(
-        canvas,
-        size,
-        forecastData,
-        minValue,
-        valueRange,
-        Colors.orange,
-        true,
-      );
-    }
-    
-    // Draw current point
-    if (historicalData.isNotEmpty) {
-      final lastPoint = historicalData.last;
-      final x = _getX(0, size, allData.length);
-      final y = _getY(lastPoint.pm25 ?? 0, size, minValue, valueRange);
-      
-      final paint = Paint()
-        ..color = theme.primaryColor
-        ..style = PaintingStyle.fill;
-      
-      canvas.drawCircle(Offset(x, y), pointRadius * 1.5, paint);
-    }
-  }
-  
-  void _drawGrid(Canvas canvas, Size size, double valueRange) {
-    final paint = Paint()
-      ..color = theme.hintColor.withAlpha(77)
-      ..strokeWidth = 1.0;
-    
-    // Draw horizontal grid lines
-    const horizontalLines = 4;
-    for (var i = 0; i <= horizontalLines; i++) {
-      final y = padding + (size.height - 2 * padding) * (1 - i / horizontalLines);
-      canvas.drawLine(
-        Offset(padding, y),
-        Offset(size.width - padding, y),
-        paint,
-      );
-    }
-  }
-  
-  void _drawLine(
-    Canvas canvas,
-    Size size,
-    List<AirQualityData> data,
-    double minValue,
-    double valueRange,
-    Color color,
-    bool isDashed,
-  ) {
-    if (data.length < 2) return;
-    
-    final path = Path();
-    final points = <Offset>[];
-    
-    // Create points
-    for (var i = 0; i < data.length; i++) {
-      final x = _getX(i, size, data.length);
-      final y = _getY(data[i].pm25 ?? 0, size, minValue, valueRange);
-      points.add(Offset(x, y));
-      
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    
-    // Draw line
-    final linePaint = Paint()
-      ..color = color
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    
-    if (isDashed) {
-      // Draw dashed line for forecast
-      const dashWidth = 4.0;
-      const dashSpace = 2.0;
-      
-      for (var i = 0; i < points.length - 1; i++) {
-        final p1 = points[i];
-        final p2 = points[i + 1];
-        
-        final dx = p2.dx - p1.dx;
-        final dy = p2.dy - p1.dy;
-        final distanceTotal = sqrt(dx * dx + dy * dy);
-        
-        var distanceCovered = 0.0;
-        while (distanceCovered < distanceTotal) {
-          final ratio = distanceCovered / distanceTotal;
-          final x1 = p1.dx + dx * ratio;
-          final y1 = p1.dy + dy * ratio;
-          
-          distanceCovered += dashWidth;
-          if (distanceCovered > distanceTotal) {
-            distanceCovered = distanceTotal;
-          }
-          
-          final ratio2 = distanceCovered / distanceTotal;
-          final x2 = p1.dx + dx * ratio2;
-          final y2 = p1.dy + dy * ratio2;
-          
-          canvas.drawLine(Offset(x1, y1), Offset(x2, y2), linePaint);
-          distanceCovered += dashSpace;
-        }
-      }
-    } else {
-      // Draw solid line for historical data
-      canvas.drawPath(path, linePaint);
-    }
-    
-    // Draw points
-    final pointPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    
-    for (final point in points) {
-      canvas.drawCircle(point, pointRadius, pointPaint);
-    }
-  }
-  
-  double _getX(int index, Size size, int totalPoints) {
-    final width = size.width - 2 * padding;
-    return padding + (width / (totalPoints - 1)) * index;
-  }
-  
-  double _getY(double value, Size size, double minValue, double valueRange) {
-    final height = size.height - 2 * padding;
-    final normalizedValue = (value - minValue) / valueRange;
-    return size.height - padding - (normalizedValue * height);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

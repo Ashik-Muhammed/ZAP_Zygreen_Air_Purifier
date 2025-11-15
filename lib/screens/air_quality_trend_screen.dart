@@ -118,6 +118,20 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
     );
   }
 
+  // Track which points are being touched
+  List<int> _touchedIndices = [];
+  
+  // Sample data points to reduce clutter in the chart
+  List<AirQualityData> _sampleData(List<AirQualityData> data, {int maxPoints = 50}) {
+    if (data.length <= maxPoints) return data;
+    
+    final step = (data.length / maxPoints).ceil();
+    return List.generate(
+      (data.length / step).ceil(),
+      (index) => data[index * step],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -293,24 +307,70 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 250,
+              height: 350,
               child: LineChart(
                 LineChartData(
                   minX: 0,
-                  maxX: filteredData.length > 1 ? (filteredData.length - 1).toDouble() : 1,
+                  // Use sampled data for better performance and clarity
+                  maxX: filteredData.isNotEmpty ? (filteredData.length - 1).toDouble() : 1,
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      tooltipBgColor: theme.cardColor.withValues(alpha: 0.9 * 255).withValues(alpha: 1),
+                      tooltipRoundedRadius: 8,
+                      getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          final text = '${_formatTimeRange(historicalData[spot.spotIndex].timestamp)}\n'
+'${spot.y.toStringAsFixed(1)} AQI';
+                          return LineTooltipItem(
+                            text,
+                            theme.textTheme.bodyMedium!,
+                            textAlign: TextAlign.center,
+                            children: [
+                              TextSpan(
+                                text: '\n${_getAqiStatus(spot.y)}',
+                                style: theme.textTheme.bodySmall!.copyWith(
+                                  color: _getAqiColor(spot.y),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList();
+                      },
+                    ),
+                    touchCallback: (FlTouchEvent event, LineTouchResponse? touchResponse) {
+                      if (!mounted) return;
+                      
+                      if (event is FlPanEndEvent || event is FlLongPressEnd) {
+                        setState(() {
+                          _touchedIndices = [];
+                        });
+                      } else if (touchResponse?.lineBarSpots != null) {
+                        setState(() {
+                          _touchedIndices = touchResponse!.lineBarSpots!
+                              .map((spot) => spot.spotIndex)
+                              .toList();
+                        });
+                      }
+                    },
+                  ),
                   minY: (minAqi * 0.9).clamp(0, double.infinity), // Add some padding, ensure non-negative
                   maxY: (maxAqi * 1.1).clamp(0, double.infinity), // Add some padding, ensure non-negative
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: true,
-                    horizontalInterval: maxAqi > minAqi ? (maxAqi - minAqi) / 5 : 10,
+                    drawHorizontalLine: true,
+                    horizontalInterval: maxAqi > minAqi ? ((maxAqi - minAqi) / 4).roundToDouble() : 10,
+                    verticalInterval: filteredData.length > 10 ? (filteredData.length / 4).floorToDouble() : 1,
                     getDrawingHorizontalLine: (value) => FlLine(
-                      color: theme.dividerColor.withValues(alpha: 0.2),
-                      strokeWidth: 1,
+                      color: theme.dividerColor.withValues(alpha: 0.1),
+                      strokeWidth: 0.5,
+                      dashArray: [4, 4],
                     ),
                     getDrawingVerticalLine: (value) => FlLine(
-                      color: theme.dividerColor.withValues(alpha: 0.1),
-                      strokeWidth: 1,
+                      color: theme.dividerColor.withValues(alpha: 0.05),
+                      strokeWidth: 0.5,
+                      dashArray: [2, 4],
                     ),
                   ),
                   titlesData: FlTitlesData(
@@ -321,15 +381,18 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 30,
-                        interval: filteredData.length > 5 ? (filteredData.length / 5) : 1,
+                        interval: filteredData.length > 10 ? (filteredData.length / 4).floorToDouble() : 1,
                         getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 && value.toInt() < filteredData.length) {
+                          if (value.toInt() >= 0 && 
+                              value.toInt() < filteredData.length &&
+                              value.toInt() % ((filteredData.length / 4).floor().clamp(1, filteredData.length)) == 0) {
                             return Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
                                 _formatTimeRange(filteredData[value.toInt()].timestamp),
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.hintColor,
+                                  fontSize: 10,
                                 ),
                               ),
                             );
@@ -341,8 +404,8 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        interval: maxAqi > minAqi ? (maxAqi - minAqi) / 5 : 10,
-                        reservedSize: 40,
+                        interval: maxAqi > minAqi ? ((maxAqi - minAqi) / 4).roundToDouble() : 10,
+                        reservedSize: 36,
                         getTitlesWidget: (value, meta) {
                           return Padding(
                             padding: const EdgeInsets.only(right: 8.0),
@@ -367,25 +430,38 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                   lineBarsData: [
                     // Historical data line (only actual historical data, no forecast)
                     LineChartBarData(
-                      spots: historicalData.asMap().entries.map((entry) {
+                      spots: _sampleData(historicalData, maxPoints: 50).asMap().entries.map((entry) {
+                        // Find the original index to maintain correct x-position
+                        final originalIndex = historicalData.indexOf(entry.value);
                         return FlSpot(
-                          entry.key.toDouble(),
+                          originalIndex.toDouble(),
                           entry.value.aqi?.toDouble() ?? 0,
                         );
                       }).toList(),
                       isCurved: true,
+                      curveSmoothness: 0.3, // Slightly smoother curve
                       color: theme.primaryColor,
-                      barWidth: 3,
+                      barWidth: 2.5,
                       isStrokeCapRound: true,
                       dotData: FlDotData(
-                        show: historicalData.length < 15, // Only show dots for sparse data
+                        show: true,
                         getDotPainter: (spot, percent, barData, index) {
+                          final isTouched = _touchedIndices.any((i) => 
+                            i >= spot.x - 0.5 && i <= spot.x + 0.5
+                          );
                           return FlDotCirclePainter(
-                            radius: 3,
+                            radius: isTouched ? 5 : 0, // Only show dot when touched
                             color: _getAqiColor(spot.y),
                             strokeWidth: 2,
                             strokeColor: Colors.white,
                           );
+                        },
+                        checkToShowDot: (spot, barData) {
+                          // Only show dot for the first, last, and touched points
+                          final spotIndex = spot.x.toInt();
+                          return spotIndex == 0 || 
+                                 spotIndex == historicalData.length - 1 ||
+                                 _touchedIndices.any((i) => i >= spot.x - 0.5 && i <= spot.x + 0.5);
                         },
                       ),
                       belowBarData: BarAreaData(
@@ -403,16 +479,13 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                     // Forecast line (dashed)
                     if (_showPrediction && airQualityProvider.forecastData.isNotEmpty)
                       LineChartBarData(
-                        spots: List.generate(filteredData.length, (index) {
-                          final dataPoint = filteredData[index];
-                          if (dataPoint.timestamp.isAfter(DateTime.now())) {
-                            return FlSpot(
-                              index.toDouble(),
-                              dataPoint.aqi?.toDouble() ?? 0,
-                            );
-                          }
-                          return FlSpot.nullSpot;
-                        }).where((spot) => spot != FlSpot.nullSpot).toList(),
+                        spots: _sampleData(filteredData.where((d) => d.timestamp.isAfter(DateTime.now())).toList(), maxPoints: 20).map((dataPoint) {
+                          final index = filteredData.indexOf(dataPoint);
+                          return FlSpot(
+                            index.toDouble(),
+                            dataPoint.aqi?.toDouble() ?? 0,
+                          );
+                        }).toList(),
                         isCurved: true,
                         color: _getAqiColor(currentAirQuality).withValues(alpha: 0.7),
                         barWidth: 2,
