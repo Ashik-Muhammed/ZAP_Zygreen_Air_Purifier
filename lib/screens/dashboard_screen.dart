@@ -11,6 +11,7 @@ import 'package:zygreen_air_purifier/providers/air_quality_provider.dart';
 import 'package:zygreen_air_purifier/widgets/air_quality_forecast_card.dart';
 import 'package:zygreen_air_purifier/models/air_quality_data.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,7 +23,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  bool _isConnected = true;
+  bool _isConnected = false;
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
 
   @override
   void initState() {
@@ -39,7 +41,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _checkConnectivity();
 
     // Listen to connectivity changes
-    Connectivity().onConnectivityChanged.listen((result) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
+      if (!mounted) return;
       setState(() {
         _isConnected = result != ConnectivityResult.none;
       });
@@ -51,6 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Future<void> _checkConnectivity() async {
     final connectivityResult = await Connectivity().checkConnectivity();
+    if (!mounted) return;
     setState(() {
       _isConnected = connectivityResult != ConnectivityResult.none;
     });
@@ -63,10 +67,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (!mounted) return;
     final sensorProvider = context.read<SensorProvider>();
     await sensorProvider.initSensorData();
+    if (!mounted) return;
   }
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     _animationController.dispose();
     super.dispose();
   }

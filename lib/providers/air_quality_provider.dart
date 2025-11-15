@@ -108,10 +108,13 @@ class AirQualityProvider with ChangeNotifier {
     final recentData = data.where((d) => d.timestamp.isAfter(oneDayAgo)).toList();
     
     // For older data, keep only one point per hour
-    final olderData = data.where((d) => !d.timestamp.isAfter(oneDayAgo));
+    final olderData = data.where((d) => !d.timestamp.isAfter(oneDayAgo)).toList();
     final sampledOlderData = <AirQualityData>[];
     
     if (olderData.isNotEmpty) {
+      // Sort older data by timestamp to ensure chronological order
+      olderData.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      
       DateTime? lastKeptTime;
       
       for (final dataPoint in olderData) {

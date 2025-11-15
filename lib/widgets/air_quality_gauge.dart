@@ -32,7 +32,9 @@ class AirQualityGauge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final percentage = ((value - minValue) / (maxValue - minValue)).clamp(0.0, 1.0);
+    final percentage = (maxValue == minValue) 
+        ? 0.0 // or 1.0 depending on desired behavior when min == max
+        : ((value - minValue) / (maxValue - minValue)).clamp(0.0, 1.0);
     final angle = (percentage * 180 * math.pi / 180) - math.pi / 2;
     
     return SizedBox(
