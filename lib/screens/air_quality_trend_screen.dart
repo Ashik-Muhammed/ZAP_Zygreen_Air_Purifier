@@ -367,20 +367,18 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                   lineBarsData: [
                     // Historical data line (only actual historical data, no forecast)
                     LineChartBarData(
-                      spots: List.generate(historicalData.length, (index) {
-                        final dataPoint = historicalData[index];
-                        // Use direct index for x-coordinate to align with filteredData
+                      spots: historicalData.asMap().entries.map((entry) {
                         return FlSpot(
-                          index.toDouble(),
-                          dataPoint.aqi?.toDouble() ?? 0,
+                          entry.key.toDouble(),
+                          entry.value.aqi?.toDouble() ?? 0,
                         );
-                      }),
+                      }).toList(),
                       isCurved: true,
                       color: theme.primaryColor,
                       barWidth: 3,
                       isStrokeCapRound: true,
                       dotData: FlDotData(
-                        show: filteredData.length < 15, // Only show dots for sparse data
+                        show: historicalData.length < 15, // Only show dots for sparse data
                         getDotPainter: (spot, percent, barData, index) {
                           return FlDotCirclePainter(
                             radius: 3,

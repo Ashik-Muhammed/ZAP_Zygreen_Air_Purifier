@@ -37,11 +37,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   static const _debounceDuration = Duration(seconds: 5);
   
   // Store provider references
-  late final SensorProvider _sensorProvider;
-  late final AirQualityProvider _airQualityProvider;
+  late SensorProvider _sensorProvider;
+  late AirQualityProvider _airQualityProvider;
   
   // Store the listener to properly remove it later
-  late final VoidCallback _sensorListener;
+  VoidCallback? _sensorListener;
 
   @override
   void initState() {
@@ -77,14 +77,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Initialize providers once when dependencies change
+    
+    // Remove old listener if it exists
+    if (_sensorListener != null) {
+      _sensorProvider.removeListener(_sensorListener!);
+    }
+    
+    // Update provider references
     _sensorProvider = context.read<SensorProvider>();
     _airQualityProvider = context.read<AirQualityProvider>();
+    
+    // Set up the listener with the new provider
+    _setupSensorListener();
   }
   
   void _setupSensorListener() {
-    // Initialize the listener callback
-    _sensorListener = () {
+    // Define the listener as a local function
+    void listener() {
       if (!mounted) return;
       
       // Only proceed if we have meaningful changes
@@ -117,10 +126,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           _airQualityProvider.addDataPoint(airQualityData);
         });
       }
-    };
+    }
+    
+    // Store the listener
+    _sensorListener = listener;
     
     // Add the listener to the sensor provider
-    _sensorProvider.addListener(_sensorListener);
+    _sensorProvider.addListener(listener);
   }
 
   Future<void> _checkConnectivity() async {
@@ -149,10 +161,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _debounceTimer = null;
     
     // Remove the sensor listener if it was added
-    try {
-      _sensorProvider.removeListener(_sensorListener);
-    } catch (e) {
-      // Ignore errors if the listener wasn't added yet
+    if (_sensorListener != null) {
+      try {
+        _sensorProvider.removeListener(_sensorListener!);
+      } catch (e) {
+        // Ignore errors if the listener wasn't added yet
+      }
     }
     
     _animationController.dispose();
