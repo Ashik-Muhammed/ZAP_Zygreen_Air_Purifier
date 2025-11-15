@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zygreen_air_purifier/models/air_quality_data.dart';
 import 'package:zygreen_air_purifier/services/air_quality_forecast.dart';
+import 'dart:async';
+import 'package:collection/collection.dart';
+import 'package:archive/archive.dart';
 
 class AirQualityProvider with ChangeNotifier {
   final AirQualityForecast _forecastService = AirQualityForecast();
@@ -44,19 +47,24 @@ class AirQualityProvider with ChangeNotifier {
     }
   }
   
-  // Load historical data from local storage
+  // Load historical data from local storage with decompression
   Future<void> _loadHistoricalData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_storageKey);
+      final compressedData = prefs.getString(_storageKey);
       
-      if (jsonString != null) {
-        final List<dynamic> jsonList = jsonDecode(jsonString);
+      if (compressedData != null) {
+        // Decompress and decode the data
+        final decodedData = _decompressData(compressedData);
+        final List<dynamic> jsonList = jsonDecode(decodedData);
+        
+        // Convert JSON to AirQualityData objects
         _historicalData = jsonList
             .map((item) => AirQualityData.fromJson(Map<String, dynamic>.from(item)))
             .toList();
-         // Generate and await forecast
-         await _generateForecast();
+            
+        // Generate and await forecast
+        await _generateForecast();
       }
     } catch (e) {
       _error = 'Error loading historical data: $e';
@@ -65,27 +73,130 @@ class AirQualityProvider with ChangeNotifier {
     }
   }
   
-  // Save historical data to local storage
+  // Compress and save historical data to local storage
   Future<void> _saveHistoricalData() async {
+    if (_historicalData.isEmpty) return;
+    
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonList = _historicalData.map((data) => data.toJson()).toList();
-      await prefs.setString(_storageKey, jsonEncode(jsonList));
+      
+      // 1. Apply sampling to reduce data points
+      final sampledData = _sampleData(_historicalData);
+      
+      // 2. Convert to JSON
+      final jsonList = sampledData.map((data) => data.toJson()).toList();
+      final jsonString = jsonEncode(jsonList);
+      
+      // 3. Compress the data before saving
+      final compressedData = _compressData(jsonString);
+      
+      // 4. Save to SharedPreferences
+      await prefs.setString(_storageKey, compressedData);
     } catch (e) {
       debugPrint('Error saving historical data: $e');
     }
   }
   
+  // Sample data to reduce storage - keep all data from last 24h, then sample older data
+  List<AirQualityData> _sampleData(List<AirQualityData> data) {
+    if (data.length < 144) return List.from(data); // Keep all if less than 1 day of data (assuming 10-min intervals)
+    
+    final now = DateTime.now();
+    final oneDayAgo = now.subtract(const Duration(days: 1));
+    
+    // Keep all data from last 24 hours
+    final recentData = data.where((d) => d.timestamp.isAfter(oneDayAgo)).toList();
+    
+    // For older data, keep only one point per hour
+    final olderData = data.where((d) => !d.timestamp.isAfter(oneDayAgo));
+    final sampledOlderData = <AirQualityData>[];
+    
+    if (olderData.isNotEmpty) {
+      DateTime? lastKeptTime;
+      
+      for (final dataPoint in olderData) {
+        if (lastKeptTime == null || 
+            dataPoint.timestamp.difference(lastKeptTime).inHours >= 1) {
+          sampledOlderData.add(dataPoint);
+          lastKeptTime = dataPoint.timestamp;
+        }
+      }
+    }
+    
+    // Combine and sort by timestamp
+    final result = [...recentData, ...sampledOlderData]..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    
+    return result;
+  }
+  
+  // Simple compression using gzip
+  String _compressData(String data) {
+    try {
+      final encoder = GZipEncoder();
+      final compressed = encoder.encode(utf8.encode(data));
+      if (compressed == null) {
+        throw Exception('Compression failed');
+      }
+      return base64Encode(compressed);
+    } catch (e) {
+      debugPrint('Error compressing data: $e');
+      return data; // Return original if compression fails
+    }
+  }
+  
+  // Decompress data
+  String _decompressData(String compressedData) {
+    try {
+      final decoder = GZipDecoder();
+      final decoded = base64Decode(compressedData);
+      final decompressed = decoder.decodeBytes(decoded);
+      return utf8.decode(decompressed);
+    } catch (e) {
+      // If decompression fails, try to use the data as is (for backward compatibility)
+      debugPrint('Error decompressing data: $e');
+      return compressedData;
+    }
+  }
+  
   // Add new data point and save to storage
   Future<void> addDataPoint(AirQualityData newData) async {
+    // Don't add duplicate timestamps
+    if (_historicalData.any((d) => d.timestamp.isAtSameMomentAs(newData.timestamp))) {
+      return;
+    }
+    
     _historicalData.add(newData);
     
     // Keep only the last 7 days of data to prevent storage bloat
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
     _historicalData.removeWhere((data) => data.timestamp.isBefore(weekAgo));
     
-    await _saveHistoricalData();
+    // Only save if we have new data or it's been a while since last save
+    if (_shouldSaveNewData()) {
+      await _saveHistoricalData();
+    }
+    
     await _generateForecast();
+  }
+  
+  DateTime? _lastSaveTime;
+  static const _minSaveInterval = Duration(minutes: 5);
+  
+  bool _shouldSaveNewData() {
+    if (_lastSaveTime == null) {
+      _lastSaveTime = DateTime.now();
+      return true;
+    }
+    
+    final now = DateTime.now();
+    final timeSinceLastSave = now.difference(_lastSaveTime!);
+    
+    if (timeSinceLastSave >= _minSaveInterval) {
+      _lastSaveTime = now;
+      return true;
+    }
+    
+    return false;
   }
   
   // Update historical data and generate forecast

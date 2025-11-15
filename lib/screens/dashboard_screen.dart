@@ -10,6 +10,7 @@ import 'package:zygreen_air_purifier/providers/esp32_provider.dart';
 import 'package:zygreen_air_purifier/providers/air_quality_provider.dart';
 import 'package:zygreen_air_purifier/widgets/air_quality_forecast_card.dart';
 import 'package:zygreen_air_purifier/models/air_quality_data.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -21,6 +22,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  bool _isConnected = true;
 
   @override
   void initState() {
@@ -34,11 +36,33 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       curve: Curves.easeInOut,
     );
     _animationController.forward();
+    _checkConnectivity();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final sensorProvider = context.read<SensorProvider>();
-      sensorProvider.initSensorData();
+    // Listen to connectivity changes
+    Connectivity().onConnectivityChanged.listen((result) {
+      setState(() {
+        _isConnected = result != ConnectivityResult.none;
+      });
+      if (_isConnected) {
+        _initializeData();
+      }
     });
+  }
+
+  Future<void> _checkConnectivity() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    setState(() {
+      _isConnected = connectivityResult != ConnectivityResult.none;
+    });
+    if (_isConnected) {
+      _initializeData();
+    }
+  }
+
+  Future<void> _initializeData() async {
+    if (!mounted) return;
+    final sensorProvider = context.read<SensorProvider>();
+    await sensorProvider.initSensorData();
   }
 
   @override
@@ -62,8 +86,56 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
+  Widget _buildNoInternetUI() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.signal_wifi_off_rounded,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Internet Connection',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Please check your internet connection and try again',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _checkConnectivity,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!_isConnected) {
+      return Scaffold(
+        body: _buildNoInternetUI(),
+      );
+    }
+    
     final theme = Theme.of(context);
     final esp32Provider = Provider.of<ESP32Provider>(context, listen: false);
 
