@@ -32,16 +32,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   double? _lastTemperature;
   double? _lastHumidity;
   
-  // Debounce timer to prevent rapid updates
-  Timer? _debounceTimer;
-  static const _debounceDuration = Duration(seconds: 5);
-  
-  // Store provider references
-  late SensorProvider _sensorProvider;
-  late AirQualityProvider _airQualityProvider;
-  
-  // Store the listener to properly remove it later
-  VoidCallback? _sensorListener;
+  // Store the cleanup function for the sensor listener
+  VoidCallback? _disposeListener;
 
   @override
   void initState() {
@@ -68,72 +60,60 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
     });
     
-    // Initialize sensor listener after the first frame
+    // Set up the sensor listener after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _setupSensorListener();
+      final sensorProvider = context.read<SensorProvider>();
+      final airQualityProvider = context.read<AirQualityProvider>();
+      Timer? debounceTimer;
+      const debounceDuration = Duration(seconds: 5);
+
+      void listener() {
+        if (!mounted) return;
+        
+        // Only proceed if we have meaningful changes
+        if (_lastPm25 != sensorProvider.pm25 ||
+            _lastPm10 != sensorProvider.pm10 ||
+            _lastTemperature != sensorProvider.temperature ||
+            _lastHumidity != sensorProvider.humidity) {
+              
+          // Update the last values
+          _lastPm25 = sensorProvider.pm25;
+          _lastPm10 = sensorProvider.pm10;
+          _lastTemperature = sensorProvider.temperature;
+          _lastHumidity = sensorProvider.humidity;
+          
+          // Cancel any pending updates
+          debounceTimer?.cancel();
+          
+          // Schedule the update with debouncing
+          debounceTimer = Timer(debounceDuration, () {
+            if (!mounted) return;
+            
+            final airQualityData = AirQualityData(
+              timestamp: DateTime.now(),
+              pm25: sensorProvider.pm25,
+              pm10: sensorProvider.pm10,
+              co2: sensorProvider.temperature * 100, // Scale temperature for demo
+              voc: sensorProvider.humidity * 10, // Scale humidity for demo
+            );
+            
+            airQualityProvider.addDataPoint(airQualityData);
+          });
+        }
+      }
+
+      // Add the listener
+      sensorProvider.addListener(listener);
+      
+      // Store the cleanup function
+      _disposeListener = () {
+        debounceTimer?.cancel();
+        sensorProvider.removeListener(listener);
+      };
     });
   }
   
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    
-    // Remove old listener if it exists
-    if (_sensorListener != null) {
-      _sensorProvider.removeListener(_sensorListener!);
-    }
-    
-    // Update provider references
-    _sensorProvider = context.read<SensorProvider>();
-    _airQualityProvider = context.read<AirQualityProvider>();
-    
-    // Set up the listener with the new provider
-    _setupSensorListener();
-  }
   
-  void _setupSensorListener() {
-    // Define the listener as a local function
-    void listener() {
-      if (!mounted) return;
-      
-      // Only proceed if we have meaningful changes
-      if (_lastPm25 != _sensorProvider.pm25 ||
-          _lastPm10 != _sensorProvider.pm10 ||
-          _lastTemperature != _sensorProvider.temperature ||
-          _lastHumidity != _sensorProvider.humidity) {
-            
-        // Update the last values
-        _lastPm25 = _sensorProvider.pm25;
-        _lastPm10 = _sensorProvider.pm10;
-        _lastTemperature = _sensorProvider.temperature;
-        _lastHumidity = _sensorProvider.humidity;
-        
-        // Cancel any pending updates
-        _debounceTimer?.cancel();
-        
-        // Schedule the update with debouncing
-        _debounceTimer = Timer(_debounceDuration, () {
-          if (!mounted) return;
-          
-          final airQualityData = AirQualityData(
-            timestamp: DateTime.now(),
-            pm25: _sensorProvider.pm25,
-            pm10: _sensorProvider.pm10,
-            co2: _sensorProvider.temperature * 100, // Scale temperature for demo
-            voc: _sensorProvider.humidity * 10, // Scale humidity for demo
-          );
-          
-          _airQualityProvider.addDataPoint(airQualityData);
-        });
-      }
-    }
-    
-    // Store the listener
-    _sensorListener = listener;
-    
-    // Add the listener to the sensor provider
-    _sensorProvider.addListener(listener);
-  }
 
   Future<void> _checkConnectivity() async {
     final connectivityResult = await Connectivity().checkConnectivity();
@@ -157,18 +137,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   void dispose() {
     // Cancel and clean up all resources
     _connectivitySubscription?.cancel();
-    _debounceTimer?.cancel();
-    _debounceTimer = null;
-    
-    // Remove the sensor listener if it was added
-    if (_sensorListener != null) {
-      try {
-        _sensorProvider.removeListener(_sensorListener!);
-      } catch (e) {
-        // Ignore errors if the listener wasn't added yet
-      }
-    }
-    
+    _disposeListener?.call();
     _animationController.dispose();
     super.dispose();
   }
