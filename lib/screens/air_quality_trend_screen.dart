@@ -157,8 +157,11 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
     final periodEnd = DateTime.now().subtract(duration);
     final periodStart = periodEnd.subtract(duration);
     
+    // Include data points that fall exactly on the period boundaries
     final previousPeriod = airQualityProvider.historicalData
-        .where((data) => data.timestamp.isAfter(periodStart) && data.timestamp.isBefore(periodEnd))
+        .where((data) => 
+            !data.timestamp.isBefore(periodStart) && 
+            !data.timestamp.isAfter(periodEnd))
         .toList();
     
     // Calculate average AQI for current period
@@ -366,11 +369,9 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                     LineChartBarData(
                       spots: List.generate(historicalData.length, (index) {
                         final dataPoint = historicalData[index];
+                        // Use direct index for x-coordinate to align with filteredData
                         return FlSpot(
-                          // Calculate x position based on time to maintain proper spacing
-                          historicalData.length > 1 
-                              ? (index / (historicalData.length - 1)) * (filteredData.length - 1)
-                              : 0.0,
+                          index.toDouble(),
                           dataPoint.aqi?.toDouble() ?? 0,
                         );
                       }),
