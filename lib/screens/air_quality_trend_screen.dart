@@ -141,24 +141,37 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
     final maxAqi = aqiValues.isEmpty ? 0 : aqiValues.reduce((a, b) => a > b ? a : b);
     final avgAqi = aqiValues.isEmpty ? 0 : aqiValues.reduce((a, b) => a + b) / aqiValues.length;
     
-    // Calculate trend (comparing current period with previous period)
+    // Calculate trend (comparing current period with equivalent previous period)
     final currentPeriod = historicalData;
+    
+    // Calculate the duration of the current period
+    final duration = _selectedTimeRange == '12h' 
+        ? const Duration(hours: 12)
+        : _selectedTimeRange == '24h'
+            ? const Duration(hours: 24)
+            : _selectedTimeRange == '7d'
+                ? const Duration(days: 7)
+                : const Duration(days: 30);
+    
+    // Get the previous period data (same duration as current period, but before the current period)
+    final periodEnd = DateTime.now().subtract(duration);
+    final periodStart = periodEnd.subtract(duration);
+    
     final previousPeriod = airQualityProvider.historicalData
-        .where((data) => data.timestamp.isBefore(
-            _selectedTimeRange == '24h' 
-                ? DateTime.now().subtract(const Duration(hours: 24))
-                : DateTime.now().subtract(const Duration(days: 7))
-        ))
+        .where((data) => data.timestamp.isAfter(periodStart) && data.timestamp.isBefore(periodEnd))
         .toList();
-        
+    
+    // Calculate average AQI for current period
     final currentPeriodAqi = currentPeriod.map((e) => e.aqi ?? 0).toList();
     final currentAvg = currentPeriodAqi.isEmpty ? 0 : 
         currentPeriodAqi.reduce((a, b) => a + b) / currentPeriodAqi.length;
-        
+    
+    // Calculate average AQI for previous period
     final previousPeriodAqi = previousPeriod.map((e) => e.aqi ?? 0).toList();
     final previousAvg = previousPeriodAqi.isEmpty ? 0 : 
         previousPeriodAqi.reduce((a, b) => a + b) / previousPeriodAqi.length;
     
+    // Calculate trend percentage
     final trend = previousAvg > 0 ? ((currentAvg - previousAvg) / previousAvg) * 100 : 0;
     
     return Scaffold(
@@ -349,12 +362,15 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                     ),
                   ),
                   lineBarsData: [
-                    // Historical data line
+                    // Historical data line (only actual historical data, no forecast)
                     LineChartBarData(
-                      spots: List.generate(filteredData.length, (index) {
-                        final dataPoint = filteredData[index];
+                      spots: List.generate(historicalData.length, (index) {
+                        final dataPoint = historicalData[index];
                         return FlSpot(
-                          index.toDouble(),
+                          // Calculate x position based on time to maintain proper spacing
+                          historicalData.length > 1 
+                              ? (index / (historicalData.length - 1)) * (filteredData.length - 1)
+                              : 0.0,
                           dataPoint.aqi?.toDouble() ?? 0,
                         );
                       }),

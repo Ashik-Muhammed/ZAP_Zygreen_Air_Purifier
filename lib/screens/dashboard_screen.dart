@@ -25,6 +25,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   late Animation<double> _fadeAnimation;
   bool _isConnected = false;
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  
+  // Track previous sensor values to avoid unnecessary updates
+  double? _lastPm25;
+  double? _lastPm10;
+  double? _lastTemperature;
+  double? _lastHumidity;
+  
+  // Debounce timer to prevent rapid updates
+  Timer? _debounceTimer;
+  static const _debounceDuration = Duration(seconds: 5); // Adjust as needed
 
   @override
   void initState() {
@@ -50,6 +60,52 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         _initializeData();
       }
     });
+    
+    // Initialize sensor listener after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupSensorListener();
+    });
+  }
+  
+  void _setupSensorListener() {
+    final sensorProvider = context.read<SensorProvider>();
+    final airQualityProvider = context.read<AirQualityProvider>();
+    
+    // Add a listener to the sensor provider
+    sensorProvider.addListener(() {
+      if (!mounted) return;
+      
+      // Only proceed if we have meaningful changes
+      if (_lastPm25 != sensorProvider.pm25 ||
+          _lastPm10 != sensorProvider.pm10 ||
+          _lastTemperature != sensorProvider.temperature ||
+          _lastHumidity != sensorProvider.humidity) {
+            
+        // Update the last values
+        _lastPm25 = sensorProvider.pm25;
+        _lastPm10 = sensorProvider.pm10;
+        _lastTemperature = sensorProvider.temperature;
+        _lastHumidity = sensorProvider.humidity;
+        
+        // Cancel any pending updates
+        _debounceTimer?.cancel();
+        
+        // Schedule the update with debouncing
+        _debounceTimer = Timer(_debounceDuration, () {
+          if (!mounted) return;
+          
+          final airQualityData = AirQualityData(
+            timestamp: DateTime.now(),
+            pm25: sensorProvider.pm25,
+            pm10: sensorProvider.pm10,
+            co2: sensorProvider.temperature * 100, // Scale temperature for demo
+            voc: sensorProvider.humidity * 10, // Scale humidity for demo
+          );
+          
+          airQualityProvider.addDataPoint(airQualityData);
+        });
+      }
+    });
   }
 
   Future<void> _checkConnectivity() async {
@@ -73,6 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
+    _debounceTimer?.cancel();
     _animationController.dispose();
     super.dispose();
   }
@@ -241,19 +298,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                     );
                   }
-
-                  // Update air quality data when sensor data changes
-                  final airQualityData = AirQualityData(
-                    timestamp: DateTime.now(),
-                    pm25: sensorProvider.pm25,
-                    pm10: sensorProvider.pm10,
-                    // Using temperature as a placeholder for CO2 and VOC since they're not available
-                    co2: sensorProvider.temperature * 100, // Scale temperature for demo
-                    voc: sensorProvider.humidity * 10, // Scale humidity for demo
-                  );
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    airQualityProvider.addDataPoint(airQualityData);
-                  });
 
                   // Check if device is connected
                   final isConnected = esp32Provider.isConnected && 
