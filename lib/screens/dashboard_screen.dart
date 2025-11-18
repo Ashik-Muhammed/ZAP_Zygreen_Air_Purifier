@@ -35,13 +35,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // Store the cleanup function for the sensor listener
   VoidCallback? _disposeListener;
 
+  late Animation<double> _pulseAnimation;
+  
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
     );
+    
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
@@ -407,7 +417,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                                 children: [
                                   _buildDeviceStatusCard(theme, sensorProvider),
                                   const SizedBox(height: 12),
-                                  _buildAirQualityCard(context, theme),
+                                  _buildHeroAQICard(sensorProvider),
                                   const SizedBox(height: 12),
                                   _buildMetricsGrid(context, theme),
                                   const SizedBox(height: 12),
@@ -746,11 +756,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
     );
   }
-
-  Widget _buildAirQualityCard(BuildContext context, ThemeData theme) {
-    final sensorProvider = context.watch<SensorProvider>();
+List<Color> _getAqiGradient(double aqi) {
+    if (aqi <= 50) return [const Color(0xFF00D9A5), const Color(0xFF00B4DB)];
+    if (aqi <= 100) return [const Color(0xFF6C5CE7), const Color(0xFF9D7FEA)];
+    if (aqi <= 150) return [const Color(0xFFFFA500), const Color(0xFFFF8C00)];
+    if (aqi <= 200) return [const Color(0xFFFF6B9D), const Color(0xFFC86DD7)];
+    if (aqi <= 300) return [const Color(0xFF8B5CF6), const Color(0xFF6C5CE7)];
+    return [const Color(0xFFDC143C), const Color(0xFF8B0000)];
+  }
+  Widget _buildHeroAQICard(SensorProvider sensorProvider) {
     final aqi = sensorProvider.airQuality.toDouble();
-    final color = _getAqiColor(aqi);
+    final color = _getAqiGradient(aqi);
     final status = _getAqiStatus(aqi);
     
     return GestureDetector(
@@ -759,182 +775,137 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         MaterialPageRoute(builder: (_) => const AirQualityTrendScreen()),
       ),
       child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        margin: const EdgeInsets.only(bottom: 16),
+        height: 280,
         decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
           gradient: LinearGradient(
-            colors: [Colors.white, color.withOpacity(0.05)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
+            colors: color,
           ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.2), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+              color: color[0].withOpacity(0.4),
+              blurRadius: 30,
+              offset: const Offset(0, 15),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Air Quality Index',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600,
-                      ),
+            // Animated background pattern
+            ...List.generate(3, (index) {
+              return Positioned(
+                right: -50 + (index * 30),
+                top: 50 + (index * 40),
+                child: ScaleTransition(
+                  scale: _pulseAnimation,
+                  child: Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.05),
                     ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              );
+            }),
+            Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Air Quality Index',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              status,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(Icons.air, color: Colors.white, size: 28),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        aqi.toStringAsFixed(0),
+                        style: const TextStyle(
+                          fontSize: 80,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          height: 1,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    shape: BoxShape.circle,
+                      const SizedBox(width: 12),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          'AQI',
+                          style: TextStyle(
+                            fontSize: 24,
+                            color: Colors.white.withOpacity(0.8),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Icon(Icons.air, color: color, size: 32),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  aqi.toStringAsFixed(0),
-                  style: TextStyle(
-                    fontSize: 56,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'AQI',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _buildAqiProgressBar(aqi, color, theme),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  'View Detailed Trend',
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(Icons.arrow_forward, size: 16, color: color),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAqiProgressBar(double aqiValue, Color color, ThemeData theme) {
-    final progress = (aqiValue / 500).clamp(0.0, 1.0);
-    return Column(
-      children: [
-        Stack(
-          children: [
-            Container(
-              height: 12,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(6),
-              ),
-            ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 1000),
-              curve: Curves.easeOutCubic,
-              height: 12,
-              width: MediaQuery.of(context).size.width * progress * 0.85,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [color.withOpacity(0.6), color],
-                ),
-                borderRadius: BorderRadius.circular(6),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Icon(Icons.trending_up, color: Colors.white.withOpacity(0.8), size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'View detailed analytics',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(Icons.arrow_forward_ios, color: Colors.white.withOpacity(0.8), size: 16),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildAqiLabel('0', Colors.green),
-            _buildAqiLabel('50', Colors.yellow[700]!),
-            _buildAqiLabel('100', Colors.orange),
-            _buildAqiLabel('200', Colors.red),
-            _buildAqiLabel('300+', Colors.purple),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAqiLabel(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10,
-          color: color,
-          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -947,15 +918,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (aqi <= 200) return 'Unhealthy';
     if (aqi <= 300) return 'Very Unhealthy';
     return 'Hazardous';
-  }
-
-  Color _getAqiColor(double aqi) {
-    if (aqi <= 50) return const Color(0xFF10B981);
-    if (aqi <= 100) return const Color(0xFFFBBF24);
-    if (aqi <= 150) return const Color(0xFFF97316);
-    if (aqi <= 200) return const Color(0xFFEF4444);
-    if (aqi <= 300) return const Color(0xFF8B5CF6);
-    return const Color(0xFF6366F1);
   }
 
   Widget _buildMetricsGrid(BuildContext context, ThemeData theme) {
@@ -1130,7 +1092,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     // More granular AQI categories
     final isGoodAir = aqi <= 50;
     final isModerate = aqi > 50 && aqi <= 100;
-    final isUnhealthySensitive = aqi > 100 && aqi <= 150;
     final isUnhealthy = aqi > 150 && aqi <= 200;
     final isVeryUnhealthy = aqi > 200 && aqi <= 300;
     final isHazardous = aqi > 300;
