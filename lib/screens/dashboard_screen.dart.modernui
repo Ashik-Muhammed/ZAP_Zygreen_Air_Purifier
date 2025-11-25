@@ -506,24 +506,22 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
  Widget _buildNotConnectedUI() {
-  return Scaffold(
-    body: Container(
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: const AssetImage('assets/images/app_background.jpg'),
-          fit: BoxFit.cover,
-          colorFilter: ColorFilter.mode(
-            Colors.black.withOpacity(0.3), 
-            BlendMode.darken,
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: const AssetImage('assets/images/app_background.jpg'),
+            fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              Colors.black.withOpacity(0.3), 
+              BlendMode.darken,
+            ),
           ),
         ),
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
+        child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(32.0),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Animated icon
@@ -546,11 +544,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 40),
                 const Text(
                   'No Device Connected',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -558,7 +556,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Connect your air purifier to start monitoring air quality in real-time',
+                  'Connect your air purifier to start\nmonitoring air quality in real-time',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
@@ -566,11 +564,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     height: 1.6,
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 48),
                 
                 // Features list
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(20),
@@ -579,7 +577,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     ),
                   ),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       _buildFeatureItem(
                         Icons.analytics_outlined,
@@ -599,54 +596,48 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   ),
                 ),
                 
-                const SizedBox(height: 32),
+                const SizedBox(height: 40),
                 
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ConnectDeviceScreen(),
-                        ),
-                      );
-                      
-                      // Refresh if device was connected
-                      if (result == true && mounted) {
-                        setState(() {});
-                      }
-                    },
-                    icon: const Icon(Icons.add_circle_outline, size: 24),
-                    label: const Text(
-                      'Connect Device',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00D9FF),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ConnectDeviceScreen(),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 8,
-                      shadowColor: const Color(0xFF00D9FF).withOpacity(0.5),
-                      minimumSize: const Size(double.infinity, 56),
+                    );
+                    
+                    // Refresh if device was connected
+                    if (result == true && mounted) {
+                      setState(() {});
+                    }
+                  },
+                  icon: const Icon(Icons.add_circle_outline, size: 28),
+                  label: const Text(
+                    'Connect Device',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00D9FF),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 20,
                     ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 8,
+                    shadowColor: const Color(0xFF00D9FF).withOpacity(0.5),
                   ),
                 ),
-                const SizedBox(height: 20),
               ],
             ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildFeatureItem(IconData icon, String text) {
     return Row(
@@ -884,38 +875,30 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     // Clear sensor data and reset state
     await sensorProvider.clearDeviceData();
     
-    // Close the loading dialog and show success message
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pop();
+    // Close the loading dialog
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
     
     // Show success message
     if (mounted) {
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text('Device disconnected successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Device disconnected successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   } catch (e) {
     // Close the loading dialog if there's an error
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pop();
-    
-    // Show error message
     if (mounted) {
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('Error disconnecting device: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error disconnecting device: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -988,7 +971,37 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         const SizedBox(height: 24),
         _buildHeroAQICard(sensorProvider),
         const SizedBox(height: 32),
-        
+        Center(
+          child: GestureDetector(
+            onTap: _togglePower,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: _isPowerOn
+                    ? const LinearGradient(colors: [Color(0xFFFF4757), Color(0xFFFF6B81)])
+                    : LinearGradient(colors: [Colors.grey[700]!, Colors.grey[800]!]),
+                boxShadow: [
+                  BoxShadow(
+                    color: _isPowerOn ? const Color(0xFFFF4757).withOpacity(0.5) : Colors.black.withOpacity(0.3),
+                    blurRadius: 24,
+                    spreadRadius: 4,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.power_settings_new, color: Colors.white, size: 40),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: Text(
+            _isPowerOn ? 'Tap to turn OFF' : 'Tap to turn ON',
+            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+        ),
       ],
     );
   }
@@ -1109,9 +1122,10 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   Widget _buildStatisticsSection(SensorProvider sensorProvider, AirQualityProvider airQualityProvider) {
-    final status = _getAqiStatus(sensorProvider.airQuality.toDouble());
-    final aqi = sensorProvider.airQuality.toInt(); // LIVE VALUE
-    final aqiColor = _getAqiColor(aqi.toDouble());
+    final aqi = sensorProvider.airQuality.toDouble();
+    final status = _getAqiStatus(aqi);
+    final aqiColor = _getAqiColor(aqi);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1188,12 +1202,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           },
         ),
         const SizedBox(height: 24),
-       if (airQualityProvider.forecastData.isNotEmpty)
-          AirQualityForecastCard(
-            currentAqi: aqi, // Pass the live AQI here
-            forecastData: airQualityProvider.forecastData, 
-            isLoading: airQualityProvider.isLoading
-          ),
+        if (airQualityProvider.historicalData.isNotEmpty || airQualityProvider.forecastData.isNotEmpty)
+          AirQualityForecastCard(historicalData: airQualityProvider.historicalData, forecastData: airQualityProvider.forecastData, isLoading: airQualityProvider.isLoading),
       ],
     );
   }
