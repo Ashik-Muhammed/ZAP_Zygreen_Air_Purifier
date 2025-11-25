@@ -506,148 +506,145 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
  Widget _buildNotConnectedUI() {
-  return Scaffold(
-    body: Container(
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: const AssetImage('assets/images/app_background.jpg'),
-          fit: BoxFit.cover,
-          colorFilter: ColorFilter.mode(
-            Colors.black.withOpacity(0.3), 
-            BlendMode.darken,
-          ),
+  return Container(
+    decoration: BoxDecoration(
+      image: DecorationImage(
+        image: const AssetImage('assets/images/app_background.jpg'),
+        fit: BoxFit.cover,
+        colorFilter: ColorFilter.mode(
+          Colors.black.withOpacity(0.3), 
+          BlendMode.darken,
         ),
       ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Animated icon
-                ScaleTransition(
-                  scale: _pulseAnimation,
-                  child: Container(
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFF00D9FF).withOpacity(0.3),
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.devices_other_outlined,
-                      size: 80,
-                      color: Color(0xFF00D9FF),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                const Text(
-                  'No Device Connected',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Connect your air purifier to start monitoring air quality in real-time',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 16,
-                    height: 1.6,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                
-                // Features list
-                Container(
-                  padding: const EdgeInsets.all(20),
+    ),
+    child: SafeArea(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Animated icon
+              ScaleTransition(
+                scale: _pulseAnimation,
+                child: Container(
+                  padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.white.withOpacity(0.1),
+                    shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.1),
+                      color: const Color(0xFF00D9FF).withOpacity(0.3),
+                      width: 2,
                     ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildFeatureItem(
-                        Icons.analytics_outlined,
-                        'Real-time Air Quality Monitoring',
-                      ),
-                      const SizedBox(height: 16),
-                      _buildFeatureItem(
-                        Icons.insights_outlined,
-                        'AI-Powered Predictions',
-                      ),
-                      const SizedBox(height: 16),
-                      _buildFeatureItem(
-                        Icons.settings_remote_outlined,
-                        'Remote Device Control',
-                      ),
-                    ],
+                  child: const Icon(
+                    Icons.devices_other_outlined,
+                    size: 80,
+                    color: Color(0xFF00D9FF),
                   ),
                 ),
-                
-                const SizedBox(height: 32),
-                
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ConnectDeviceScreen(),
-                        ),
-                      );
-                      
-                      // Refresh if device was connected
-                      if (result == true && mounted) {
-                        setState(() {});
-                      }
-                    },
-                    icon: const Icon(Icons.add_circle_outline, size: 24),
-                    label: const Text(
-                      'Connect Device',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00D9FF),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 8,
-                      shadowColor: const Color(0xFF00D9FF).withOpacity(0.5),
-                      minimumSize: const Size(double.infinity, 56),
-                    ),
+              ),
+              const SizedBox(height: 32),
+              const Text(
+                'No Device Connected',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Connect your air purifier to start monitoring air quality in real-time',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 16,
+                  height: 1.6,
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              // Features list
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
                   ),
                 ),
-                const SizedBox(height: 20),
-              ],
-            ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildFeatureItem(
+                      Icons.analytics_outlined,
+                      'Real-time Air Quality Monitoring',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFeatureItem(
+                      Icons.insights_outlined,
+                      'AI-Powered Predictions',
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFeatureItem(
+                      Icons.settings_remote_outlined,
+                      'Remote Device Control',
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 32),
+              
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ConnectDeviceScreen(),
+                      ),
+                    );
+                    
+                    // Refresh if device was connected
+                    if (result == true && mounted) {
+                      setState(() {});
+                    }
+                  },
+                  icon: const Icon(Icons.add_circle_outline, size: 24),
+                  label: const Text(
+                    'Connect Device',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00D9FF),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 8,
+                    shadowColor: const Color(0xFF00D9FF).withOpacity(0.5),
+                    minimumSize: const Size(double.infinity, 56),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 100),
+            ],
           ),
         ),
       ),
     ),
   );
 }
-
   Widget _buildFeatureItem(IconData icon, String text) {
     return Row(
       children: [
@@ -1093,12 +1090,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   String _getAqiStatus(double aqi) {
     if (aqi <= 50) return 'Good';
     if (aqi <= 100) return 'Moderate';
-    if (aqi <= 150) return 'Unhealthy';
+    if (aqi <= 150) return 'Sensitive';
     if (aqi <= 200) return 'Unhealthy';
-    if (aqi <= 300) return 'Very Bad';
+    if (aqi <= 300) return 'Very Unhealthy';
     return 'Hazardous';
   }
-
   Color _getAqiColor(double aqi) {
     if (aqi <= 50) return const Color(0xFF00E676);
     if (aqi <= 100) return const Color(0xFFFFC107);
