@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
 import 'package:zygreen_air_purifier/screens/air_quality_trend_screen.dart';
+import 'package:zygreen_air_purifier/screens/air_quality_history_screen.dart';
 import 'package:zygreen_air_purifier/screens/connect_device_screen.dart';
 import 'package:zygreen_air_purifier/providers/esp32_provider.dart';
 import 'package:zygreen_air_purifier/providers/air_quality_provider.dart';
@@ -511,15 +512,21 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       image: DecorationImage(
         image: const AssetImage('assets/images/app_background.jpg'),
         fit: BoxFit.cover,
+        alignment: Alignment.center,
         colorFilter: ColorFilter.mode(
           Colors.black.withOpacity(0.3), 
           BlendMode.darken,
         ),
       ),
     ),
+    constraints: const BoxConstraints.expand(),
     child: SafeArea(
       child: SingleChildScrollView(
-        child: Padding(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
+          ),
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -598,7 +605,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 ),
               ),
               
-              const SizedBox(height: 32),
+              const SizedBox(height: 40),
               
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -637,7 +644,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   ),
                 ),
               ),
-              const SizedBox(height: 100),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -1150,8 +1157,16 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildQuickAction(icon: Icons.show_chart, label: 'Trends', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AirQualityTrendScreen()))),
-            _buildQuickAction(icon: Icons.history, label: 'History', onTap: () {}),
-            _buildQuickAction(icon: Icons.share, label: 'Share', onTap: () {}),
+            _buildQuickAction(
+              icon: Icons.history, 
+              label: 'History', 
+              onTap: () => Navigator.push(
+                context, 
+                MaterialPageRoute(
+                  builder: (_) => const AirQualityHistoryScreen()
+                )
+              )
+            ),
           ],
         ),
         const SizedBox(height: 32),

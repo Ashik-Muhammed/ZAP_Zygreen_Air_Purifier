@@ -174,9 +174,12 @@ class AirQualityProvider with ChangeNotifier {
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
     _historicalData.removeWhere((data) => data.timestamp.isBefore(weekAgo));
     
-    // Only save if we have new data or it's been a while since last save
+    // Always save when adding new data points to prevent data loss
+    await _saveHistoricalData();
+    
+    // Only update last save time if it's an auto-save
     if (_shouldSaveNewData()) {
-      await _saveHistoricalData();
+      _lastSaveTime = DateTime.now();
     }
     
     await _generateForecast();
@@ -194,12 +197,7 @@ class AirQualityProvider with ChangeNotifier {
     final now = DateTime.now();
     final timeSinceLastSave = now.difference(_lastSaveTime!);
     
-    if (timeSinceLastSave >= _minSaveInterval) {
-      _lastSaveTime = now;
-      return true;
-    }
-    
-    return false;
+    return timeSinceLastSave >= _minSaveInterval;
   }
   
   // Update historical data and generate forecast

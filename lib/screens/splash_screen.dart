@@ -14,7 +14,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     // Navigate to dashboard after 2 seconds
-    Future.delayed(const Duration(seconds: 2), () {
+    Future.delayed(const Duration(seconds: 3), () {
       // ignore: use_build_context_synchronously
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const DashboardScreen()),
@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen> {
              SizedBox(height: 24),
             // App Name
              Text(
-              'Zygreen Air',
+              'Zygreen',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 32,
