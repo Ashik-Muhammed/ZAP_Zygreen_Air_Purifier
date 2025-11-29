@@ -67,6 +67,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   web_socket_channel: ^3.0.3
   font_awesome_flutter: ^10.12.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -105,6 +106,21 @@ flutter:
   - assets/images/app_background.jpg
   - assets/images/AIRPURI.png
   - assets/images/logo.jpg
+  - assets/images/logo.png
+  - assets/images/vaishakh.jpg
+  - assets/images/athul.jpg
+  - assets/images/aleeena.jpg
+  - assets/images/alen.jpg
+  - assets/images/ashik.jpg
+  - assets/images/ob1.jpg
+  - assets/images/ob2.jpg
+  - assets/images/ob3.jpg
+  - assets/images/ob4.jpg
+  - assets/images/ob5.jpg
+  - assets/images/onboarding1.jpg
+  - assets/images/onboarding2.jpg
+  - assets/images/onboarding3.jpg
+
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

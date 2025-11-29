@@ -6,8 +6,12 @@ import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
 import 'package:zygreen_air_purifier/screens/air_quality_trend_screen.dart';
 import 'package:zygreen_air_purifier/screens/air_quality_history_screen.dart';
 import 'package:zygreen_air_purifier/screens/connect_device_screen.dart';
+import 'package:zygreen_air_purifier/screens/data_privacy_screen.dart';
+import 'package:zygreen_air_purifier/screens/about_us_screen.dart';
 import 'package:zygreen_air_purifier/providers/esp32_provider.dart';
 import 'package:zygreen_air_purifier/providers/air_quality_provider.dart';
+import 'package:zygreen_air_purifier/screens/user_manual.dart';
+import 'package:zygreen_air_purifier/screens/contact_us_screen.dart';
 import 'package:zygreen_air_purifier/widgets/air_quality_forecast_card.dart';
 import 'package:zygreen_air_purifier/models/air_quality_data.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -686,11 +690,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Smart',
+              'ZyGreen',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 28,
-                fontWeight: FontWeight.w300,
+                fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
               ),
             ),
@@ -699,7 +703,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 32,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w300,
                 letterSpacing: 0.5,
               ),
             ),
@@ -1217,11 +1221,47 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         const SizedBox(height: 24),
         _buildSettingCard('Device Information', Icons.info_outline, 'Device ID: ${esp32Provider.connectedDeviceId ?? "Unknown"}', () {}),
         const SizedBox(height: 12),
-        _buildSettingCard('Notifications', Icons.notifications_outlined, 'Manage air quality alerts', () {}),
+       _buildSettingCard(
+  "User Manual", 
+  Icons.book, 
+  "View detailed user guide", 
+  () {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const UserManualScreen(),
+      ),
+    );
+  }
+),
         const SizedBox(height: 12),
-        _buildSettingCard('Auto Mode', Icons.auto_awesome, 'Configure automatic operation', () {}),
+        _buildSettingCard("About Us", Icons.info, "Learn more about ZyGreen", () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const AboutUsScreen(),
+            ),
+          );
+        }),
         const SizedBox(height: 12),
-        _buildSettingCard('Data & Privacy', Icons.shield_outlined, 'Manage your data', () {}),
+        _buildSettingCard("Contact Us", Icons.email, "Get in touch with our team", () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const ContactUsScreen(),
+            ),
+          );
+        }),
+        const SizedBox(height: 12),
+        _buildSettingCard(
+          'Data & Privacy', 
+          Icons.shield_outlined, 
+          'Manage your data', 
+          () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const DataPrivacyScreen(),
+              ),
+            );
+          },
+        ),
       ],
     );
   }
