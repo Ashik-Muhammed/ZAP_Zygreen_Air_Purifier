@@ -65,7 +65,6 @@ class _ConnectDeviceScreenState extends State<ConnectDeviceScreen> {
         _showErrorSnackBar('Failed to connect. Check Device ID.');
       }
     } catch (e) {
-      debugPrint('Error connecting: $e');
       if (mounted) {
         _showErrorSnackBar('Connection error: ${e.toString()}');
       }

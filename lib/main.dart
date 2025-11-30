@@ -1,3 +1,5 @@
+// ignore_for_file: empty_catches
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -46,11 +48,9 @@ Future<void> main() async {
             await sensorProvider.initSensorData();
           }
         } catch (e) {
-          debugPrint('Error reconnecting to device: $e');
         }
       }
     } catch (e) {
-      debugPrint('Error during provider initialization: $e');
       // Continue running the app even if initialization fails
     }    
     // Run the app with providers
@@ -65,7 +65,6 @@ Future<void> main() async {
       ),
     );
   } catch (e) {
-    debugPrint('Error initializing app: $e');
     runApp(
       const MaterialApp(
         home: Scaffold(

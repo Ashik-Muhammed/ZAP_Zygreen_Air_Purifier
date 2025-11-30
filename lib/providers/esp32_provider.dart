@@ -1,3 +1,5 @@
+// ignore_for_file: empty_catches
+
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -85,7 +87,6 @@ class ESP32Provider with ChangeNotifier {
         }
       }
     } catch (e) {
-      debugPrint('Error loading connection state: $e');
     }
   }
 
@@ -151,9 +152,8 @@ class ESP32Provider with ChangeNotifier {
         _deviceIp = data['ip'];
         notifyListeners();
       }
-    } catch (e) {
-      debugPrint('Error fetching device info: $e');
-    }
+    } catch (e) {}
+    
   }
 
   // Send command to the connected device

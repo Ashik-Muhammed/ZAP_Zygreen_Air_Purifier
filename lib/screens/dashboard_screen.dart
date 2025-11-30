@@ -110,8 +110,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             timestamp: DateTime.now(),
             pm25: sensorProvider.pm25,
             pm10: sensorProvider.pm10,
-            co2: sensorProvider.temperature * 100,
-            voc: sensorProvider.humidity * 10,
+            co2: sensorProvider.eco2.toDouble(),
+            voc: sensorProvider.voc.toDouble(),
           );
           
           airQualityProvider.addDataPoint(airQualityData);
@@ -200,9 +200,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     
     return Consumer3<ESP32Provider, SensorProvider, AirQualityProvider>(
       builder: (context, esp32Provider, sensorProvider, airQualityProvider, _) {
-        // Debug print to check connection status
-        debugPrint('ESP32 Connected: ${esp32Provider.isConnected}');
-        debugPrint('Device ID: ${esp32Provider.connectedDeviceId}');
+
         
         // Check device connection status
         final isDeviceConnected = esp32Provider.isConnected && 
@@ -1194,8 +1192,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     SizedBox(width: cardWidth, child: _buildMetricCard('PM10', sensorProvider.pm10.toStringAsFixed(1), Icons.cloud_outlined, const Color(0xFFB695C0))),
-                    SizedBox(width: cardWidth, child: _buildMetricCard('VOC', (sensorProvider.humidity * 10).toStringAsFixed(0), Icons.air, const Color(0xFF8AC926))),
-                    SizedBox(width: cardWidth, child: _buildMetricCard('CO₂', (sensorProvider.temperature * 100).toStringAsFixed(0), Icons.eco, const Color(0xFF06FFA5))),
+                    SizedBox(width: cardWidth, child: _buildMetricCard('VOC', sensorProvider.voc.toString(), Icons.air, const Color(0xFF8AC926))),
+                    SizedBox(width: cardWidth, child: _buildMetricCard('CO₂', sensorProvider.eco2.toString(), Icons.eco, const Color(0xFF06FFA5))),
                   ],
                 ),
               ],

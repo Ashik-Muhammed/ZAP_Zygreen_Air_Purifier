@@ -6,6 +6,7 @@ class AirQualityData {
   final double? co2;
   final double? voc;
   final bool isPrediction;
+  final double? confidence;
 
   AirQualityData({
     required this.timestamp,
@@ -14,6 +15,7 @@ class AirQualityData {
     this.co2,
     this.voc,
     this.isPrediction = false,
+    this.confidence,
   });
 
   // Convert to JSON
@@ -25,6 +27,7 @@ class AirQualityData {
       'co2': co2,
       'voc': voc,
       'isPrediction': isPrediction,
+      'confidence': confidence,
     };
   }
 
@@ -37,6 +40,7 @@ class AirQualityData {
       co2: json['co2']?.toDouble(),
       voc: json['voc']?.toDouble(),
       isPrediction: json['isPrediction'] ?? false,
+      confidence: json['confidence']?.toDouble(),
     );
   }
 
@@ -48,6 +52,7 @@ class AirQualityData {
     double? co2,
     double? voc,
     bool? isPrediction,
+    double? confidence,
   }) {
     return AirQualityData(
       timestamp: timestamp ?? this.timestamp,
@@ -56,6 +61,7 @@ class AirQualityData {
       co2: co2 ?? this.co2,
       voc: voc ?? this.voc,
       isPrediction: isPrediction ?? this.isPrediction,
+      confidence: confidence ?? this.confidence,
     );
   }
 

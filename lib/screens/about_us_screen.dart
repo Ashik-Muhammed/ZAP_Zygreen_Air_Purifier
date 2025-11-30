@@ -44,51 +44,7 @@ class AboutUsScreen extends StatelessWidget {
 
                 const SizedBox(height: AppTheme.spacingXL),
 
-                // Team Section
-                _buildSectionHeader(context, 'Meet The Team'),
-                const SizedBox(height: AppTheme.spacingS),
-                Text(
-                  'The brilliant minds behind Zygreen',
-                  style: textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: AppTheme.spacingL),
                 
-                // Team Members
-                _buildTeamMemberCard(
-                  context,
-                  'Vaishakh M V',
-                  'Founder',
-                  'MBA in ESG, MSc Microbiology',
-                  'assets/images/vaishakh.jpg',
-                ),
-                _buildTeamMemberCard(
-                  context,
-                  'Athul S',
-                  'Co-Founder',
-                  'PhD Microbiology',
-                  'assets/images/athul.jpg',
-                ),
-                _buildTeamMemberCard(
-                  context,
-                  'Aleena Uthaman',
-                  'Agriculture Expert',
-                  '',
-                  'assets/images/aleeena.jpg',
-                ),
-                _buildTeamMemberCard(
-                  context,
-                  'Alan M Daniel',
-                  'Bio-Architecturist',
-                  '',
-                  'assets/images/alen.jpg',
-                ),
-                _buildTeamMemberCard(
-                  context,
-                  'Ashik Muhammed S',
-                  'AI & IoT Developer',
-                  '',
-                  'assets/images/ashik.jpg',
-                ),
 
                 const SizedBox(height: AppTheme.spacingXL),
 
@@ -340,97 +296,6 @@ class AboutUsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTeamMemberCard(BuildContext context, String name, String role,
-      String description, String imagePath) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppTheme.spacingM),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppTheme.surface, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primary.withValues(alpha: 0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                  image: DecorationImage(
-                    image: AssetImage(imagePath),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        role,
-                        style: const TextStyle(
-                          color: AppTheme.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        description,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildContactTile(BuildContext context, IconData icon, String title,
       String subtitle, VoidCallback onTap) {

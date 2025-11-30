@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
 import 'package:zygreen_air_purifier/providers/sensor_provider.dart';
 import 'package:zygreen_air_purifier/providers/air_quality_provider.dart';
 import 'package:zygreen_air_purifier/models/air_quality_data.dart';
+import 'package:zygreen_air_purifier/widgets/air_quality_chart.dart';
 import 'dart:math';
 
 class AirQualityTrendScreen extends StatefulWidget {
@@ -15,34 +14,28 @@ class AirQualityTrendScreen extends StatefulWidget {
 }
 
 class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
-  String _selectedTimeRange = '24h';
-  
-  // 1. FILTERING
+  // 1. FILTERING - Get only real sensor data points for the last 24 hours
   List<AirQualityData> _getFilteredData(List<AirQualityData> allData) {
     if (allData.isEmpty) return [];
     
+    // Filter out any predicted/forecasted data
+    final sensorData = allData.where((data) => !data.isPrediction).toList();
+    if (sensorData.isEmpty) return [];
+    
+    // Sort by timestamp
+    sensorData.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    
+    // Get data from the last 24 hours
     final now = DateTime.now();
-    DateTime startTime;
+    final twentyFourHoursAgo = now.subtract(const Duration(hours: 24));
     
-    switch (_selectedTimeRange) {
-      case '12h': startTime = now.subtract(const Duration(hours: 12)); break;
-      case '7d': startTime = now.subtract(const Duration(days: 7)); break;
-      case '30d': startTime = now.subtract(const Duration(days: 30)); break;
-      case '24h': default: startTime = now.subtract(const Duration(hours: 24)); break;
-    }
+    // Filter to only include recent data with valid sensor readings
+    final recentData = sensorData.where((data) => 
+      data.timestamp.isAfter(twentyFourHoursAgo) &&
+      (data.pm25 != null || data.pm10 != null || data.co2 != null || data.voc != null)
+    ).toList();
     
-    return allData.where((data) => data.timestamp.isAfter(startTime)).toList();
-  }
-
-  // 2. SAMPLING
-  List<AirQualityData> _downsampleData(List<AirQualityData> data, int maxPoints) {
-    if (data.length <= maxPoints) return data;
-    final step = data.length / maxPoints;
-    List<AirQualityData> sampled = [];
-    for (double i = 0; i < data.length; i += step) {
-      sampled.add(data[i.floor()]);
-    }
-    return sampled;
+    return recentData.isEmpty ? [sensorData.last] : recentData;
   }
 
   @override
@@ -55,26 +48,29 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
     // DATA PREP
     final fullHistory = _getFilteredData(airQualityProvider.historicalData);
     
-    // STATS CALCULATION
+    // STATS CALCULATION - Using only real sensor data
     double minAqi = currentAqi;
     double maxAqi = currentAqi;
     double avgAqi = currentAqi;
 
     if (fullHistory.isNotEmpty) {
-      final allValues = fullHistory.map((e) => e.aqi?.toDouble() ?? 0.0).toList();
-      allValues.add(currentAqi);
+      // Calculate AQI for each historical data point using sensor values
+      final aqiValues = fullHistory.map((data) {
+        // Simple AQI calculation based on PM2.5 (you can adjust the formula)
+        final pm25 = data.pm25 ?? 0;
+        final pm10 = data.pm10 ?? 0;
+        return (pm25 * 0.7) + (pm10 * 0.3); // Adjust weights as needed
+      }).toList();
       
-      minAqi = allValues.reduce(min);
-      maxAqi = allValues.reduce(max);
-      avgAqi = allValues.reduce((a, b) => a + b) / allValues.length;
-    }
-
-    // CHART DATA PREP
-    final displayHistory = _downsampleData(fullHistory, 30);
-    
-    double chartMaxY = 100;
-    if (fullHistory.isNotEmpty) {
-      chartMaxY = (maxAqi * 1.2).clamp(100.0, 500.0);
+      // Add current AQI to the values
+      aqiValues.add(currentAqi);
+      
+      // Calculate statistics
+      if (aqiValues.isNotEmpty) {
+        minAqi = aqiValues.reduce(min);
+        maxAqi = aqiValues.reduce(max);
+        avgAqi = aqiValues.reduce((a, b) => a + b) / aqiValues.length;
+      }
     }
 
     // MAIN UI STRUCTURE
@@ -99,7 +95,7 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
             image: const AssetImage('assets/images/app_background.jpg'),
             fit: BoxFit.cover,
             colorFilter: ColorFilter.mode(
-              Colors.black.withValues(alpha:0.3), 
+              Colors.black.withAlpha((0.3 * 255).toInt()), 
               BlendMode.darken,
             ),
             onError: (_, __) {}, // Safety fallbacks handled by gradient below
@@ -137,119 +133,23 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                 
                 const SizedBox(height: 32),
                 
-                // CHART SECTION
-                const Text("Historical Data", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
+               
+                // AQI Trend Chart
                 Container(
-                  height: 350,
-                  padding: const EdgeInsets.fromLTRB(16, 24, 24, 10),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08), // Glass effect
+                    color: Colors.white.withAlpha((0.08 * 255).toInt()),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    border: Border.all(color: Colors.white.withAlpha((0.1 * 255).toInt())),
                   ),
-                  child: displayHistory.isEmpty 
-                  ? Center(child: Text("Collecting history...", style: TextStyle(color: Colors.white.withValues(alpha: 0.6))))
-                  : LineChart(
-                      LineChartData(
-                        minX: 0,
-                        maxX: (displayHistory.length - 1).toDouble(),
-                        minY: 0,
-                        maxY: chartMaxY,
-                        gridData: FlGridData(
-                          show: true, 
-                          drawVerticalLine: false,
-                          horizontalInterval: chartMaxY / 5,
-                          getDrawingHorizontalLine: (value) => FlLine(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            strokeWidth: 1,
-                            dashArray: [5, 5]
-                          ),
-                        ),
-                        borderData: FlBorderData(show: false),
-                        titlesData: FlTitlesData(
-                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 30,
-                              interval: chartMaxY / 5,
-                              getTitlesWidget: (value, meta) {
-                                return Text(
-                                  value.toInt().toString(),
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
-                                );
-                              }
-                            )
-                          ),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              interval: (displayHistory.length / 4).ceilToDouble(),
-                              getTitlesWidget: (value, meta) {
-                                final index = value.toInt();
-                                if (index >= 0 && index < displayHistory.length) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 12.0),
-                                    child: Text(
-                                      DateFormat('h:mm').format(displayHistory[index].timestamp),
-                                      style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.6)),
-                                    ),
-                                  );
-                                }
-                                return const SizedBox();
-                              },
-                            ),
-                          ),
-                        ),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: displayHistory.asMap().entries.map((e) {
-                              return FlSpot(e.key.toDouble(), e.value.aqi?.toDouble() ?? 0);
-                            }).toList(),
-                            isCurved: true,
-                            curveSmoothness: 0.35,
-                            color: const Color(0xFF00D9FF), // Cyan/Blue theme color
-                            barWidth: 3,
-                            isStrokeCapRound: true,
-                            dotData: const FlDotData(show: false),
-                            belowBarData: BarAreaData(
-                              show: true, 
-                              gradient: LinearGradient(
-                                colors: [
-                                  const Color(0xFF00D9FF).withValues(alpha: 0.3),
-                                  const Color(0xFF00D9FF).withValues(alpha: 0.0),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              )
-                            ),
-                          ),
-                        ],
-                        lineTouchData: LineTouchData(
-                          touchTooltipData: LineTouchTooltipData(
-                            tooltipBgColor: const Color(0xFF1A2840),
-                            tooltipRoundedRadius: 8,
-                            getTooltipItems: (touchedSpots) {
-                              return touchedSpots.map((spot) {
-                                return LineTooltipItem(
-                                  "${spot.y.toInt()}",
-                                  const TextStyle(color: Color(0xFF00D9FF), fontWeight: FontWeight.bold),
-                                  children: [
-                                    const TextSpan(
-                                      text: " AQI",
-                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.normal, fontSize: 10)
-                                    )
-                                  ]
-                                );
-                              }).toList();
-                            }
-                          )
-                        )
-                      ),
-                    ),
+                  child: AirQualityChart(
+                    airQuality: currentAqi,
+                    isLoading: fullHistory.isEmpty,
+                  ),
                 ),
+                const SizedBox(height: 24),
+                // Current AQI Display
+                
               ],
             ),
           ),
@@ -258,27 +158,22 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
     );
   }
 
-  // Styled Time Selector Dropdown
+  // Current AQI display only - no time range selection needed
   Widget _buildTimeSelector() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
+        color: Colors.white.withAlpha((0.1 * 255).toInt()),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        border: Border.all(color: Colors.white.withAlpha((0.2 * 255).toInt())),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedTimeRange,
-          dropdownColor: const Color(0xFF1A2840), // Dark background for menu
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 18),
-          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-          onChanged: (v) => setState(() => _selectedTimeRange = v!),
-          items: ['12h', '24h', '7d', '30d'].map((e) => DropdownMenuItem(
-            value: e, 
-            child: Text(e)
-          )).toList(),
-        ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timeline, size: 16, color: Colors.white70),
+          SizedBox(width: 4),
+          Text('24h Trend', style: TextStyle(color: Colors.white, fontSize: 13)),
+        ],
       ),
     );
   }
@@ -289,9 +184,9 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: Colors.white.withAlpha((0.08 * 255).toInt()),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          border: Border.all(color: Colors.white.withAlpha((0.1 * 255).toInt())),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,7 +196,7 @@ class _AirQualityTrendScreenState extends State<AirQualityTrendScreen> {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.2),
+                    color: color.withAlpha((0.2 * 255).toInt()),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: color, size: 16),

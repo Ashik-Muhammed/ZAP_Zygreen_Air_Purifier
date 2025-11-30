@@ -60,6 +60,15 @@ class ContactUsScreen extends StatelessWidget {
                       color: Colors.grey[600],
                     ),
                   ),
+                         const SizedBox(height: 20),
+                                    _buildContactCard(
+                    context,
+                    title: 'Our Website',
+                    subtitle: 'zygreen.in',
+                    description: 'Visit our website for more information',
+                    icon: Icons.location_on_rounded,
+                    color: Colors.blue,
+                  ),
                   const SizedBox(height: 32),
                   _buildContactCard(
                     context,
@@ -87,15 +96,7 @@ class ContactUsScreen extends StatelessWidget {
                     icon: Icons.location_on_rounded,
                     color: Colors.blue,
                   ),
-                  const SizedBox(height: 20),
-                                    _buildContactCard(
-                    context,
-                    title: 'Our Website',
-                    subtitle: 'zygreen.in',
-                    description: 'Visit our website for more information',
-                    icon: Icons.location_on_rounded,
-                    color: Colors.blue,
-                  ),
+           
                   const SizedBox(height: 20),
                   
                   

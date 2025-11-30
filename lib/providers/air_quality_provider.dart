@@ -1,15 +1,18 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zygreen_air_purifier/models/air_quality_data.dart';
-import 'package:zygreen_air_purifier/services/air_quality_forecast.dart';
-import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:archive/archive.dart';
+import 'package:zygreen_air_purifier/models/air_quality_data.dart';
+import 'package:zygreen_air_purifier/services/air_quality_forecast.dart';
 
 class AirQualityProvider with ChangeNotifier {
-  final AirQualityForecast _forecastService = AirQualityForecast();
+  late final AirQualityForecast _forecastService;
+  static const int _minDataPointsForForecast = 3;
+  // Removed unused field
   static const String _storageKey = 'air_quality_history';
   
   List<AirQualityData> _historicalData = [];
@@ -18,7 +21,9 @@ class AirQualityProvider with ChangeNotifier {
   bool _isInitialized = false;
   String? _error;
   
-  AirQualityProvider();
+  AirQualityProvider() {
+    _forecastService = AirQualityForecast();
+  }
   
   // Getters
   UnmodifiableListView<AirQualityData> get historicalData => UnmodifiableListView(_historicalData);
@@ -68,7 +73,6 @@ class AirQualityProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = 'Error loading historical data: $e';
-      debugPrint(_error);
       rethrow;
     }
   }
@@ -92,9 +96,7 @@ class AirQualityProvider with ChangeNotifier {
       
       // 4. Save to SharedPreferences
       await prefs.setString(_storageKey, compressedData);
-    } catch (e) {
-      debugPrint('Error saving historical data: $e');
-    }
+    } catch (_) {    }
   }
   
   // Sample data to reduce storage - keep all data from last 24h, then sample older data
@@ -142,7 +144,6 @@ class AirQualityProvider with ChangeNotifier {
       }
       return base64Encode(compressed);
     } catch (e) {
-      debugPrint('Error compressing data: $e');
       return data; // Return original if compression fails
     }
   }
@@ -156,7 +157,6 @@ class AirQualityProvider with ChangeNotifier {
       return utf8.decode(decompressed);
     } catch (e) {
       // If decompression fails, try to use the data as is (for backward compatibility)
-      debugPrint('Error decompressing data: $e');
       return compressedData;
     }
   }
@@ -223,29 +223,74 @@ class AirQualityProvider with ChangeNotifier {
   
   // Generate forecast based on historical data
   Future<void> _generateForecast() async {
-    try {
-      if (_historicalData.length >= 3) {
-        // Use combined prediction if we have enough data
-        _forecastData = _forecastService.predictCombined(_historicalData);
-      } else if (_historicalData.isNotEmpty) {
-        // Use simple prediction for small datasets
-        _forecastData = _forecastService.predictSimpleMovingAverage(_historicalData);
-      } else {
-        _forecastData = [];
-      }
-    } catch (e) {
-      _error = 'Failed to generate forecast: $e';
-      _forecastData = [];
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+  if (_historicalData.length < _minDataPointsForForecast) {
+    _forecastData = [];
+    _isLoading = false;
+    notifyListeners();
+    return;
+  }
+
+  _isLoading = true;
+  notifyListeners();
+
+  try {
+    _forecastData = _forecastService.generateForecast(_historicalData);
+  } catch (e) {
+    debugPrint('Error generating forecast: $e');
+    _forecastData = []; // Clear forecast on error
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+  // Get trend analysis with direction and confidence
+  Map<String, dynamic> getTrendAnalysis() {
+    if (_historicalData.length < 2) {
+      return {'direction': 0.0, 'confidence': 0.0, 'magnitude': 0.0};
     }
+    
+    // Use the last 6 data points for trend analysis
+    final window = min(6, _historicalData.length);
+    final recentData = _historicalData.sublist(_historicalData.length - window);
+    
+    // Calculate simple linear regression
+    double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    final n = recentData.length.toDouble();
+    
+    for (int i = 0; i < recentData.length; i++) {
+      final x = i.toDouble();
+      final y = recentData[i].pm25 ?? 0.0;
+      sumX += x;
+      sumY += y;
+      sumXY += x * y;
+      sumX2 += x * x;
+    }
+    
+    final slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    
+    // Calculate R² (coefficient of determination)
+    double ssTotal = 0, ssResidual = 0;
+    final meanY = sumY / n;
+    
+    for (int i = 0; i < recentData.length; i++) {
+      final y = recentData[i].pm25 ?? 0.0;
+      final yPred = slope * i + (sumY - slope * sumX) / n;
+      ssTotal += (y - meanY) * (y - meanY);
+      ssResidual += (y - yPred) * (y - yPred);
+    }
+    
+    final rSquared = 1 - (ssResidual / (ssTotal == 0 ? 1 : ssTotal));
+    
+    return {
+      'direction': slope,
+      'confidence': rSquared.clamp(0.0, 1.0),
+      'magnitude': slope.abs(),
+    };
   }
   
-  // Get trend direction (-1 to 1)
+  // Backward compatibility method
   double getTrendDirection() {
-    if (_historicalData.length < 2) return 0;
-    return _forecastService.getTrendDirection(_historicalData);
+    return getTrendAnalysis()['direction'] ?? 0.0;
   }
   
   // Get air quality status based on current data
@@ -254,27 +299,51 @@ class AirQualityProvider with ChangeNotifier {
     return _historicalData.last.status;
   }
   
-  // Get forecast summary
-  String? getForecastSummary() {
-    if (_forecastData.isEmpty || _historicalData.isEmpty) return null;
+  // Get forecast summary with confidence
+  Map<String, dynamic> getForecastSummary() {
+    if (_forecastData.isEmpty || _historicalData.isEmpty) {
+      return {
+        'summary': 'Insufficient data for forecast',
+        'confidence': 0.0,
+        'trend': 0.0,
+      };
+    }
     
-    final currentAqi = _historicalData.last.aqi;
-    final forecastAqi = _forecastData.last.aqi;
-    
-    if (currentAqi == null || forecastAqi == null) return null;
+    final currentAqi = _historicalData.last.aqi ?? 0;
+    final forecastAqi = _forecastData.first.aqi ?? currentAqi;
+    final confidence = _forecastData.first.confidence ?? 0.5;
     
     final difference = forecastAqi - currentAqi;
+    final trend = difference / (currentAqi > 0 ? currentAqi : 1);
     
+    String summary;
     if (difference < -10) {
-      return 'Significant improvement expected';
+      summary = 'Significant improvement expected';
     } else if (difference < 0) {
-      return 'Slight improvement expected';
+      summary = 'Slight improvement expected';
     } else if (difference < 10) {
-      return 'Air quality will remain stable';
+      summary = 'Air quality will remain stable';
     } else if (difference < 30) {
-      return 'Slight deterioration expected';
+      summary = 'Slight deterioration expected';
     } else {
-      return 'Significant deterioration expected';
+      summary = 'Significant deterioration expected';
     }
+    
+    return {
+      'summary': summary,
+      'confidence': confidence,
+      'trend': trend,
+      'currentAqi': currentAqi,
+      'forecastAqi': forecastAqi,
+      'difference': difference,
+    };
+  }
+  
+  // Get forecast for a specific time period (in hours from now)
+  AirQualityData? getForecastForTime(int hoursAhead) {
+    if (_forecastData.isEmpty || hoursAhead < 0) return null;
+    
+    final index = hoursAhead.clamp(0, _forecastData.length - 1);
+    return _forecastData[index];
   }
 }

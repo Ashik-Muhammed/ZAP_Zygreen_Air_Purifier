@@ -1,3 +1,5 @@
+// ignore_for_file: empty_catches
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:zygreen_air_purifier/services/firebase_service.dart';
@@ -13,6 +15,8 @@ class SensorProvider with ChangeNotifier {
     'airQuality': 0,
     'pm25': 0.0,
     'pm10': 0.0,
+    'eco2': 0,
+    'voc': 0,
     'timestamp': 0,
   };
   bool _isLoading = false;
@@ -54,6 +58,18 @@ class SensorProvider with ChangeNotifier {
     if (value == null) return 0;
     return value is double ? value.toInt() : (value as num).toInt();
   }
+  
+  int get eco2 {
+    final value = _sensorData['eco2'];
+    if (value == null) return 0;
+    return value is double ? value.toInt() : (value as num).toInt();
+  }
+  
+  int get voc {
+    final value = _sensorData['voc'];
+    if (value == null) return 0;
+    return value is double ? value.toInt() : (value as num).toInt();
+  }
   bool get isLoading => _isLoading;
   String? get error => _error;
   String? get deviceId => _deviceId;
@@ -61,18 +77,16 @@ class SensorProvider with ChangeNotifier {
   // Initialize the sensor data stream
   Future<void> initSensorData() async {
     if (_isLoading) {
-      debugPrint('SensorProvider: Already loading, skipping init');
       return;
     }
     
-    _isLoading = true;
+      _isLoading = true;
     _error = null;
     notifyListeners();
     
     try {
       // Get the device ID first
       _deviceId = await _firebaseService.getDeviceId();
-      debugPrint('SensorProvider: Using device ID: $_deviceId');
       
       if (_deviceId == null || _deviceId!.isEmpty) {
         throw Exception('No device ID found');
@@ -82,9 +96,7 @@ class SensorProvider with ChangeNotifier {
       try {
         final data = await _firebaseService.getLatestSensorData();
         _sensorData = data;
-        debugPrint('Initial sensor data: $_sensorData');
       } catch (e) {
-        debugPrint('Error getting initial data: $e');
         _error = 'Error loading initial data: $e';
         notifyListeners();
       }
@@ -93,14 +105,12 @@ class SensorProvider with ChangeNotifier {
       _subscription?.cancel();
       _subscription = _firebaseService.getSensorData().listen(
         (data) {
-          debugPrint('Received sensor data update: $data');
           _sensorData = data;
           _error = null;
           _isLoading = false;
           notifyListeners();
         },
         onError: (error) {
-          debugPrint('Error in sensor data stream: $error');
           _error = 'Error in sensor data stream: $error';
           _isLoading = false;
           notifyListeners();
@@ -109,7 +119,6 @@ class SensorProvider with ChangeNotifier {
       );
       
     } catch (e) {
-      debugPrint('Error initializing sensor data: $e');
       _error = 'Failed to initialize: $e';
       _isLoading = false;
       notifyListeners();
@@ -117,27 +126,23 @@ class SensorProvider with ChangeNotifier {
     
     _isLoading = true;
     _error = null;
-    debugPrint('SensorProvider: Initializing sensor data...');
     
     // Schedule the notification for the next frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isDisposed) {
-        debugPrint('SensorProvider: Notifying listeners (initial loading state)');
+        notifyListeners();
         notifyListeners();
       }
     });
 
     // Get initial data
-    debugPrint('SensorProvider: Fetching latest sensor data...');
     _firebaseService.getLatestSensorData().then((data) {
       if (_isDisposed) return;
-      debugPrint('SensorProvider: Received initial data: $data');
       _sensorData = data;
       _isLoading = false;
       if (!_isDisposed) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!_isDisposed) {
-            debugPrint('SensorProvider: Notifying listeners after initial data load');
             notifyListeners();
           }
         });
@@ -146,11 +151,9 @@ class SensorProvider with ChangeNotifier {
       if (_isDisposed) return;
       _error = 'Failed to load sensor data: $error';
       _isLoading = false;
-      debugPrint('SensorProvider: Error loading initial data: $error');
       if (!_isDisposed) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!_isDisposed) {
-            debugPrint('SensorProvider: Notifying listeners after error');
             notifyListeners();
           }
         });
@@ -161,18 +164,15 @@ class SensorProvider with ChangeNotifier {
     _subscription?.cancel();
     
     // Subscribe to real-time updates
-    debugPrint('SensorProvider: Subscribing to real-time updates');
     _subscription = _firebaseService.getSensorData().listen(
       (data) {
         if (_isDisposed) return;
-        debugPrint('SensorProvider: Received real-time update: $data');
         _sensorData = data;
         _isLoading = false;
         _error = null;
         if (!_isDisposed) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!_isDisposed) {
-              debugPrint('SensorProvider: Notifying listeners after real-time update');
               notifyListeners();
             }
           });
@@ -182,11 +182,9 @@ class SensorProvider with ChangeNotifier {
         if (_isDisposed) return;
         _error = 'Error in sensor data stream: $error';
         _isLoading = false;
-        debugPrint('SensorProvider: Error in real-time stream: $error');
-        if (!_isDisposed) {
+          if (!_isDisposed) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!_isDisposed) {
-              debugPrint('SensorProvider: Notifying listeners after stream error');
               notifyListeners();
             }
           });
@@ -229,8 +227,7 @@ class SensorProvider with ChangeNotifier {
   }
 
   Future<void> clearDeviceData() async {
-    debugPrint('SensorProvider: Clearing device data and resetting state');
-    
+
     // Cancel any active subscription first
     await _subscription?.cancel();
     _subscription = null;
@@ -252,10 +249,8 @@ class SensorProvider with ChangeNotifier {
     try {
       _firebaseService.dispose();
     } catch (e) {
-      debugPrint('Error resetting Firebase service: $e');
     }
     
-    debugPrint('SensorProvider: Device data cleared and state reset');
     
     // Notify listeners if still mounted
     if (!_isDisposed) {

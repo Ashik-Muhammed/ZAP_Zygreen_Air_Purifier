@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:zygreen_air_purifier/providers/air_quality_provider.dart';
+import 'package:zygreen_air_purifier/models/air_quality_data.dart';
 import 'package:intl/intl.dart';
 
 class AirQualityHistoryScreen extends StatelessWidget {
   const AirQualityHistoryScreen({super.key});
 
+  // Get the raw AQI value from the data model
+  int _getAqiValue(AirQualityData data) {
+    // Use the raw AQI value from the model, defaulting to 0 if null
+    return data.aqi ?? 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final airQualityProvider = Provider.of<AirQualityProvider>(context);
-    final history = airQualityProvider.historicalData;
+    // Sort history by timestamp (newest first)
+    final history = List<AirQualityData>.from(airQualityProvider.historicalData)
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -66,16 +75,16 @@ class AirQualityHistoryScreen extends StatelessWidget {
                         leading: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: _getAqiColor((data.aqi ?? 0).toDouble()).withValues(alpha:0.2),
+                            color: _getAqiColor(_getAqiValue(data)).withValues(alpha:0.2),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            _getAqiIcon((data.aqi ?? 0).toDouble()),
-                            color: _getAqiColor((data.aqi ?? 0).toDouble()),
+                            _getAqiIcon(_getAqiValue(data)),
+                            color: _getAqiColor(_getAqiValue(data)),
                           ),
                         ),
                         title: Text(
-                          'AQI: ${data.aqi?.toStringAsFixed(0) ?? "N/A"}',
+                          'AQI: ${_getAqiValue(data).toStringAsFixed(0)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -91,9 +100,9 @@ class AirQualityHistoryScreen extends StatelessWidget {
                           ),
                         ),
                         trailing: Text(
-                          _getAqiStatus((data.aqi ?? 0).toDouble()),
+                          _getAqiStatus(_getAqiValue(data)),
                           style: TextStyle(
-                            color: _getAqiColor((data.aqi ?? 0).toDouble()),
+                            color: _getAqiColor(_getAqiValue(data)),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -106,7 +115,7 @@ class AirQualityHistoryScreen extends StatelessWidget {
     );
   }
 
-  Color _getAqiColor(double aqi) {
+  Color _getAqiColor(int aqi) {
     if (aqi <= 50) return Colors.green;
     if (aqi <= 100) return Colors.lightGreen;
     if (aqi <= 150) return Colors.yellow;
@@ -115,7 +124,7 @@ class AirQualityHistoryScreen extends StatelessWidget {
     return Colors.purple;
   }
 
-  String _getAqiStatus(double aqi) {
+  String _getAqiStatus(int aqi) {
     if (aqi <= 50) return 'Good';
     if (aqi <= 100) return 'Moderate';
     if (aqi <= 150) return 'Unhealthy for Sensitive';
@@ -124,7 +133,7 @@ class AirQualityHistoryScreen extends StatelessWidget {
     return 'Hazardous';
   }
 
-  IconData _getAqiIcon(double aqi) {
+  IconData _getAqiIcon(int aqi) {
     if (aqi <= 50) return Icons.thumb_up;
     if (aqi <= 100) return Icons.thumb_up_outlined;
     if (aqi <= 150) return Icons.warning_amber_rounded;

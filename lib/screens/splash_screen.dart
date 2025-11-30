@@ -38,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final isOnboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
     
     // Add a small delay for the splash screen to be visible
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 3));
     
     if (!mounted) return;
 
@@ -86,15 +86,9 @@ class _SplashScreenState extends State<SplashScreen> {
                       duration: const Duration(seconds: 1),
                       opacity: _opacity,
                       child: Container(
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            )
-                          ],
+       
                         ),
                         child: const Image(
                           image: AssetImage('assets/images/logo.png'),
@@ -118,13 +112,7 @@ class _SplashScreenState extends State<SplashScreen> {
                             fontSize: 40, // Slightly larger
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1.5, // Adds elegance
-                            shadows: [
-                               Shadow(
-                                offset: Offset(0, 2),
-                                blurRadius: 4.0,
-                                color: Colors.black26,
-                              ),
-                            ],
+                            
                           ),
                         ),
                         const SizedBox(height: 10),

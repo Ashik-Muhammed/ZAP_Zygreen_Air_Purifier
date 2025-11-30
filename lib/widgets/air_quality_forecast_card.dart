@@ -14,15 +14,7 @@ class AirQualityForecastCard extends StatelessWidget {
     this.isLoading = false,
   });
 
-  // Adjusted colors to pop on dark background
-  Color _getAqiColor(int aqi) {
-    if (aqi <= 50) return const Color(0xFF00E676);
-    if (aqi <= 100) return const Color(0xFFFFC107);
-    if (aqi <= 150) return const Color(0xFFFF9800);
-    if (aqi <= 200) return const Color(0xFFF44336);
-    if (aqi <= 300) return const Color(0xFF9C27B0);
-    return const Color(0xFF7B1FA2);
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -97,11 +89,11 @@ class AirQualityForecastCard extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _buildAqiIndicator('Current', current, _getAqiColor(current))
+          child: _buildAqiIndicator('Current', current, Colors.white)
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: _buildAqiIndicator('1h Forecast', forecast, _getAqiColor(forecast))
+          child: _buildAqiIndicator('1h Forecast', forecast, Colors.white)
         ),
       ],
     );
@@ -111,9 +103,19 @@ class AirQualityForecastCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: const Color.fromRGBO(255, 255, 255, 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(
+          color: const Color.fromRGBO(255, 255, 255, 0.3),
+          width: 1.5,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.1),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,18 +136,17 @@ class AirQualityForecastCard extends StatelessWidget {
             children: [
               Text(
                 value.toString(),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: color,
-                  height: 1.0,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(width: 4),
-              Text(
+              const Text(
                 'AQI',
                 style: TextStyle(
-                  color: color.withValues(alpha: 0.8),
+                  color: Color.fromRGBO(255, 255, 255, 0.7),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -183,41 +184,47 @@ class AirQualityForecastCard extends StatelessWidget {
               final data = hourlyData[index];
               final time = DateFormat.j().format(data.timestamp);
               final aqi = (data.aqi ?? 0).round();
-              final color = _getAqiColor(aqi);
-
+              
               return Container(
                 width: 64,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                decoration: const BoxDecoration(
+                  color: Color.fromRGBO(255, 255, 255, 0.05),
+                  borderRadius: BorderRadius.all(Radius.circular(16)),
+                  border: Border.fromBorderSide(BorderSide(
+                    color: Color.fromRGBO(255, 255, 255, 0.1),
+                    width: 1,
+                  )),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       time, 
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11, 
-                        color: Colors.white.withValues(alpha: 0.6)
+                        color: Color.fromRGBO(255, 255, 255, 0.6),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Container(
+                      key: ValueKey('aqi_$index'),
                       width: 36,
                       height: 36,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.2),
+                        color: const Color.fromRGBO(255, 255, 255, 0.2),
                         shape: BoxShape.circle,
-                        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.5),
+                        border: Border.all(
+                          color: const Color.fromRGBO(255, 255, 255, 0.6),
+                          width: 1.5,
+                        ),
                       ),
                       child: Text(
                         aqi.toString(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
-                          color: color,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -274,8 +281,8 @@ class AirQualityForecastCard extends StatelessWidget {
                   isImproving 
                       ? 'Expected to drop by $difference points.' 
                       : 'Expected to rise by $difference points.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
+                  style: const TextStyle(
+                    color: Color.fromRGBO(255, 255, 255, 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -289,12 +296,14 @@ class AirQualityForecastCard extends StatelessWidget {
   
   Widget _buildLoadingState() {
     return Container(
-      height: 200,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        color: const Color.fromRGBO(255, 255, 255, 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color.fromRGBO(255, 255, 255, 0.3),
+          width: 1.5,
+        ),
       ),
       child: const Center(
         child: CircularProgressIndicator(color: Color(0xFF00D9FF)),
